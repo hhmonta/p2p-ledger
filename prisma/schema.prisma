@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bank {
+  id             String        @id @default(cuid())
+  name           String
+  accountType    String        @default("corriente") // "ahorro" | "corriente" | "digital" | "pago_movil"
+  accountNumber  String?
+  holderName     String?
+  currency       String        @default("VES") // VES, USD, EUR, etc.
+  initialBalance Float         @default(0)
+  isActive       Boolean       @default(true)
+  color          String        @default("#10b981") // color de identificación
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  transactionsFrom Transaction[] @relation("BankFromTransactions")
+  transactionsTo   Transaction[] @relation("BankToTransactions")
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  type          String   // "compra" | "venta"
+  counterparty  String   // persona o plataforma P2P
+  asset         String   @default("USDT") // activo negociado (USDT, BTC, USD, etc.)
+  amount        Float    // cantidad del activo
+  rate          Float    // tasa de cambio (precio unitario en moneda fiat)
+  total         Float    // monto total en moneda fiat (amount * rate)
+  currency      String   @default("VES") // moneda fiat del total
+  fromBankId    String?  // banco origen (de donde sale el dinero)
+  toBankId      String?  // banco destino (donde entra el dinero)
+  fromBank      Bank?    @relation("BankFromTransactions", fields: [fromBankId], references: [id], onDelete: SetNull)
+  toBank        Bank?    @relation("BankToTransactions", fields: [toBankId], references: [id], onDelete: SetNull)
+  status        String   @default("completada") // "pendiente" | "completada" | "cancelada"
+  reference     String?  // número de referencia / operación
+  fee           Float    @default(0) // comisión o gasto adicional
+  date          DateTime @default(now())
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([date])
+  @@index([fromBankId])
+  @@index([toBankId])
+}

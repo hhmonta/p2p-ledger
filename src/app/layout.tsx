@@ -1,0 +1,38 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "P2P Ledger — Compras, Ventas y Bancos",
+  description: "Lleva el registro completo de tus operaciones P2P: compras, ventas, contrapartes y bancos. Calcula ganancias, saldos y tasas promedio en un solo lugar.",
+  keywords: ["P2P", "compras", "ventas", "bancos", "registro", "cripto", "USDT", "ledger"],
+  authors: [{ name: "P2P Ledger" }],
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="es" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+      >
+        {children}
+        <Toaster />
+      </body>
+    </html>
+  );
+}
