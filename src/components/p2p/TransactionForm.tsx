@@ -41,6 +41,7 @@ import type {
 } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
 import { formatCurrency, formatNumber, toDateTimeInputValue } from '@/lib/format'
+import * as storage from '@/lib/storage'
 
 const txSchema = z.object({
   type: z.enum(['compra', 'venta']),
@@ -168,19 +169,10 @@ export function TransactionForm({
         notes: values.notes || null,
       }
 
-      const url = transaction
-        ? `/api/transactions/${transaction.id}`
-        : '/api/transactions'
-      const method = transaction ? 'PUT' : 'POST'
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al guardar transacción')
+      if (transaction) {
+        await storage.updateTransaction(transaction.id, payload)
+      } else {
+        await storage.createTransaction(payload)
       }
 
       toast({

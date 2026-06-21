@@ -57,6 +57,7 @@ import { TransactionForm } from './TransactionForm'
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
 import { toast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
+import * as storage from '@/lib/storage'
 
 const STATUS_LABELS: Record<TransactionStatus, string> = {
   completada: 'Completada',
@@ -86,29 +87,22 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
   // Cargar bancos para el filtro y el form
   const { data: banks = [] } = useQuery<Bank[]>({
     queryKey: ['banks'],
-    queryFn: async () => {
-      const res = await fetch('/api/banks')
-      if (!res.ok) throw new Error('Error al cargar bancos')
-      return res.json()
-    },
+    queryFn: () => storage.listBanks(),
   })
 
-  // Construir URL con filtros
-  const queryParams = useMemo(() => {
-    const params = new URLSearchParams()
-    if (mode !== 'all') params.set('type', mode)
-    if (statusFilter !== 'all') params.set('status', statusFilter)
-    if (bankFilter !== 'all') params.set('bankId', bankFilter)
-    return params.toString()
-  }, [mode, statusFilter, bankFilter])
+  // Construir filtros
+  const filters = useMemo(
+    () => ({
+      type: mode !== 'all' ? (mode as TransactionType) : undefined,
+      status: statusFilter !== 'all' ? (statusFilter as TransactionStatus) : undefined,
+      bankId: bankFilter !== 'all' ? bankFilter : undefined,
+    }),
+    [mode, statusFilter, bankFilter]
+  )
 
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: ['transactions', queryParams],
-    queryFn: async () => {
-      const res = await fetch(`/api/transactions?${queryParams}`)
-      if (!res.ok) throw new Error('Error al cargar transacciones')
-      return res.json()
-    },
+    queryKey: ['transactions', filters],
+    queryFn: () => storage.listTransactions(filters),
   })
 
   // Filtro por texto (contraparte, referencia, asset) en cliente
@@ -149,13 +143,7 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
   async function confirmDelete() {
     if (!deleting) return
     try {
-      const res = await fetch(`/api/transactions/${deleting.id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al eliminar')
-      }
+      await storage.deleteTransaction(deleting.id)
       toast({
         title: 'Transacción eliminada',
         description: `Operación con ${deleting.counterparty} fue eliminada.`,

@@ -67,3 +67,23 @@ server.log
 /Caddyfile
 /mini-services/
 /examples/
+
+# Android tools (descargados localmente, no se commitean)
+/.android-tools/
+/sdk/
+
+# Build output
+/out/
+
+# Android project ( Capacitor ) - kept, except build artifacts
+/android/app/build/
+/android/.gradle/
+/android/build/
+/android/local.properties
+/android/capacitor-cordova-android-plugins/build/
+/android/capacitor-cordova-android-plugins/.gradle/
+/android/capacitor-cordova-android-plugins/local.properties
+/android/local.properties
+
+# Capacitor
+/capacitor-cordova-android-plugins/

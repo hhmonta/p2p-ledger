@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch'
 import { Loader2 } from 'lucide-react'
 import type { Bank, BankInput } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
+import * as storage from '@/lib/storage'
 
 const bankSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
@@ -140,17 +141,10 @@ export function BankForm({
         notes: values.notes || null,
       }
 
-      const url = bank ? `/api/banks/${bank.id}` : '/api/banks'
-      const method = bank ? 'PUT' : 'POST'
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al guardar banco')
+      if (bank) {
+        await storage.updateBank(bank.id, payload)
+      } else {
+        await storage.createBank(payload)
       }
 
       toast({

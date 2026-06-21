@@ -36,17 +36,14 @@ import {
 } from 'lucide-react'
 import type { Stats } from '@/lib/types'
 import { formatCurrency, formatNumber } from '@/lib/format'
+import * as storage from '@/lib/storage'
 
 const PIE_COLORS = ['#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444']
 
 export function Dashboard() {
   const { data: stats, isLoading } = useQuery<Stats>({
     queryKey: ['stats'],
-    queryFn: async () => {
-      const res = await fetch('/api/stats')
-      if (!res.ok) throw new Error('Error al cargar stats')
-      return res.json()
-    },
+    queryFn: () => storage.getStats(),
   })
 
   if (isLoading || !stats) {

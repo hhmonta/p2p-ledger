@@ -7,6 +7,7 @@ import { Dashboard } from '@/components/p2p/Dashboard'
 import { BanksView } from '@/components/p2p/BanksView'
 import { TransactionsView } from '@/components/p2p/TransactionsView'
 import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,8 +43,9 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
               <span className="px-2 py-1 rounded-md bg-muted">Local</span>
               <span>·</span>
-              <span>Datos en tu navegador</span>
+              <span>Datos en tu dispositivo</span>
             </div>
+            <ThemeToggle />
           </div>
         </header>
 
@@ -99,7 +101,7 @@ export default function Home() {
               <span className="font-medium text-foreground">P2P Ledger</span> · Registro local de operaciones
             </p>
             <p className="text-center sm:text-right">
-              Tus datos se guardan en esta instancia. No se envían a ningún servidor externo.
+              Tus datos se guardan localmente en este dispositivo. No se envían a ningún servidor.
             </p>
           </div>
         </footer>

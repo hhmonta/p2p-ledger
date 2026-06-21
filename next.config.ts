@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
+  // Para APK con Capacitor necesitamos export estático (HTML/JS/CSS solo)
+  output: "export",
+  // Genera carpetas planas para Capacitor
+  trailingSlash: true,
+  images: {
+    unoptimized: true,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -36,6 +36,7 @@ import type { Bank } from '@/lib/types'
 import { BankForm } from './BankForm'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { toast } from '@/hooks/use-toast'
+import * as storage from '@/lib/storage'
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   corriente: 'Corriente',
@@ -53,11 +54,7 @@ export function BanksView() {
 
   const { data: banks = [], isLoading } = useQuery<Bank[]>({
     queryKey: ['banks'],
-    queryFn: async () => {
-      const res = await fetch('/api/banks')
-      if (!res.ok) throw new Error('Error al cargar bancos')
-      return res.json()
-    },
+    queryFn: () => storage.listBanks(),
   })
 
   const filtered = banks.filter((b) => {
@@ -93,13 +90,7 @@ export function BanksView() {
   async function confirmDelete() {
     if (!deleting) return
     try {
-      const res = await fetch(`/api/banks/${deleting.id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Error al eliminar')
-      }
+      await storage.deleteBank(deleting.id)
       toast({
         title: 'Banco eliminado',
         description: `«${deleting.name}» fue eliminado. Las transacciones asociadas se conservan sin banco.`,

@@ -1,0 +1,44 @@
+{
+  "name": "P2P Ledger",
+  "short_name": "P2P Ledger",
+  "description": "Registro de compras y ventas P2P y gestión de bancos",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "categories": ["finance", "productivity", "business"],
+  "lang": "es",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo banco",
+      "url": "/?tab=bancos&action=new",
+      "description": "Añadir cuenta bancaria"
+    },
+    {
+      "name": "Nueva compra",
+      "url": "/?tab=compras&action=new",
+      "description": "Registrar compra P2P"
+    },
+    {
+      "name": "Nueva venta",
+      "url": "/?tab=ventas&action=new",
+      "description": "Registrar venta P2P"
+    }
+  ]
+}
