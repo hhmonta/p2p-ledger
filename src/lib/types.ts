@@ -9,6 +9,17 @@ export type TransactionStatus = 'pendiente' | 'completada' | 'cancelada'
 // Tipo de comisión: porcentaje sobre el total fiat, o monto fijo en la moneda fiat
 export type FeeType = 'percent' | 'fixed'
 
+// Tier de comisión escalonada: aplica cuando el monto fiat >= minAmount
+// Permite modelar comisiones como "0.5% si < $100, 0.3% si >= $100"
+export interface FeeTier {
+  // Monto mínimo del total fiat para que aplique este tier
+  minAmount: number
+  // Tipo de comisión de este tier
+  feeType: FeeType
+  // Valor de la comisión (porcentaje o monto fijo según feeType)
+  feeValue: number
+}
+
 export interface Bank {
   id: string
   name: string
@@ -47,6 +58,9 @@ export interface BankInput {
 // Exchange: plataforma P2P con su esquema de comisiones.
 // Puede haber comisión de compra, de venta, o ambas.
 // La comisión puede ser porcentual (% del total fiat) o fija (monto directo en la moneda).
+// Adicionalmente, soporta:
+//   - Tiers escalonados: comisiones que varían según el monto de la operación
+//   - Descuento VIP/BNB: porcentaje que se descuenta de la comisión calculada
 export interface Exchange {
   id: string
   name: string
@@ -54,16 +68,24 @@ export interface Exchange {
   shortName: string | null
   // Color hexadecimal para identificación visual
   color: string
-  // Comisiones para operación de COMPRA
+  // Comisiones para operación de COMPRA (cuando no hay tiers)
   buyFeeType: FeeType
   buyFeeValue: number // si percent: 0.5 = 0.5%, si fixed: monto en la moneda fiat
-  // Comisiones para operación de VENTA
+  // Tiers escalonados opcionales para compra. Si se definen, reemplazan buyFeeType/buyFeeValue
+  buyTiers: FeeTier[]
+  // Comisiones para operación de VENTA (cuando no hay tiers)
   sellFeeType: FeeType
   sellFeeValue: number
+  // Tiers escalonados opcionales para venta
+  sellTiers: FeeTier[]
   // Comisión fija adicional opcional (ej. comisión de red USDT)
   fixedFee: number
   // Moneda en la que se expresa la comisión fija
   fixedFeeCurrency: string
+  // Descuento VIP/BNB (% que se resta de la comisión calculada). 0 = sin descuento. 25 = 25% off.
+  discountPercent: number
+  // Etiqueta opcional para el descuento (ej: "Descuento BNB", "VIP Nivel 3")
+  discountLabel: string | null
   isActive: boolean
   notes: string | null
   createdAt: string
@@ -80,10 +102,14 @@ export interface ExchangeInput {
   color: string
   buyFeeType: FeeType
   buyFeeValue: number
+  buyTiers?: FeeTier[]
   sellFeeType: FeeType
   sellFeeValue: number
+  sellTiers?: FeeTier[]
   fixedFee?: number
   fixedFeeCurrency?: string
+  discountPercent?: number
+  discountLabel?: string | null
   isActive?: boolean
   notes?: string | null
 }
@@ -125,9 +151,10 @@ export interface Transaction {
   fee: number
   // Detalle desglosado de la comisión (para mostrar info)
   feeBreakdown?: {
-    baseFee: number // comisión principal (variable)
+    baseFee: number // comisión principal (variable, antes de descuento)
+    discount: number // monto descontado por VIP/BNB
     fixedFee: number // comisión fija del exchange
-    total: number // suma
+    total: number // baseFee - discount + fixedFee
   } | null
   // Total neto después de comisiones (lo que efectivamente entra/sale)
   netTotal: number

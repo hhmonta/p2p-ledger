@@ -7,6 +7,7 @@ import type {
   BankInput,
   Exchange,
   ExchangeInput,
+  FeeTier,
   Transaction,
   TransactionInput,
   TransactionType,
@@ -20,7 +21,7 @@ const TX_KEY = 'p2p:transactions'
 const EXCHANGES_KEY = 'p2p:exchanges'
 const VERSION_KEY = 'p2p:version'
 
-const CURRENT_VERSION = '2'
+const CURRENT_VERSION = '3'
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -69,13 +70,42 @@ function ensureInit() {
   initialized = true
   const version = window.localStorage.getItem(VERSION_KEY)
   if (version !== CURRENT_VERSION) {
-    window.localStorage.setItem(VERSION_KEY, CURRENT_VERSION)
-    // Sembrar exchanges por defecto si no hay ninguno
-    const existing = window.localStorage.getItem(EXCHANGES_KEY)
-    if (!existing) {
+    // Si vienen de una versión anterior, migrar exchanges existentes
+    if (version === '2') {
+      const existing = readJSON<Exchange[]>(EXCHANGES_KEY, [])
+      const migrated = existing.map(migrateExchange)
+      writeJSON(EXCHANGES_KEY, migrated)
+    }
+    // Si es primera instalación (sin versión), sembrar exchanges por defecto
+    if (!version) {
       const defaults = defaultExchanges()
       writeJSON(EXCHANGES_KEY, defaults)
     }
+    window.localStorage.setItem(VERSION_KEY, CURRENT_VERSION)
+  }
+}
+
+// Migra un Exchange de esquemas anteriores al actual (añade tiers vacíos y discountPercent=0)
+function migrateExchange(e: Partial<Exchange>): Exchange {
+  return {
+    id: e.id ?? '',
+    name: e.name ?? '',
+    shortName: e.shortName ?? null,
+    color: e.color ?? '#3b82f6',
+    buyFeeType: (e.buyFeeType as FeeType) ?? 'percent',
+    buyFeeValue: e.buyFeeValue ?? 0,
+    buyTiers: e.buyTiers ?? [],
+    sellFeeType: (e.sellFeeType as FeeType) ?? 'percent',
+    sellFeeValue: e.sellFeeValue ?? 0,
+    sellTiers: e.sellTiers ?? [],
+    fixedFee: e.fixedFee ?? 0,
+    fixedFeeCurrency: e.fixedFeeCurrency ?? 'USDT',
+    discountPercent: e.discountPercent ?? 0,
+    discountLabel: e.discountLabel ?? null,
+    isActive: e.isActive ?? true,
+    notes: e.notes ?? null,
+    createdAt: e.createdAt ?? new Date().toISOString(),
+    updatedAt: e.updatedAt ?? new Date().toISOString(),
   }
 }
 
@@ -89,11 +119,15 @@ function defaultExchanges(): Exchange[] {
       shortName: 'BIN',
       color: '#f0b90b',
       buyFeeType: 'percent' as FeeType,
-      buyFeeValue: 0, // Binance P2P normalmente no cobra al comprador
+      buyFeeValue: 0,
+      buyTiers: [],
       sellFeeType: 'percent' as FeeType,
       sellFeeValue: 0,
+      sellTiers: [],
       fixedFee: 0,
       fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
       isActive: true,
       notes: 'Binance P2P no cobra comisión de taker directamente en la operación P2P. Aplican comisiones de retiro del activo.',
       createdAt: now,
@@ -106,10 +140,14 @@ function defaultExchanges(): Exchange[] {
       color: '#000000',
       buyFeeType: 'percent' as FeeType,
       buyFeeValue: 0,
+      buyTiers: [],
       sellFeeType: 'percent' as FeeType,
       sellFeeValue: 0,
+      sellTiers: [],
       fixedFee: 0,
       fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
       isActive: true,
       notes: 'OKX P2P tampoco cobra comisión directa al usuario en operaciones P2P.',
       createdAt: now,
@@ -122,10 +160,14 @@ function defaultExchanges(): Exchange[] {
       color: '#ffe600',
       buyFeeType: 'percent' as FeeType,
       buyFeeValue: 0,
+      buyTiers: [],
       sellFeeType: 'percent' as FeeType,
-      sellFeeValue: 8, // ML cobra ~8% al vendedor
+      sellFeeValue: 8,
+      sellTiers: [],
       fixedFee: 0,
       fixedFeeCurrency: 'VES',
+      discountPercent: 0,
+      discountLabel: null,
       isActive: true,
       notes: 'Mercado Libre cobra comisión al vendedor (~8% en VE). El comprador no paga.',
       createdAt: now,
@@ -138,10 +180,14 @@ function defaultExchanges(): Exchange[] {
       color: '#0070ba',
       buyFeeType: 'percent' as FeeType,
       buyFeeValue: 0,
+      buyTiers: [],
       sellFeeType: 'percent' as FeeType,
-      sellFeeValue: 4.4, // Comercial跨境 ~4.4%
+      sellFeeValue: 4.4,
+      sellTiers: [],
       fixedFee: 0.3,
       fixedFeeCurrency: 'USD',
+      discountPercent: 0,
+      discountLabel: null,
       isActive: true,
       notes: 'PayPal cobra comisión al receptor (4.4% + $0.30 fijo en transacciones comerciales internacionales).',
       createdAt: now,
@@ -153,13 +199,27 @@ function defaultExchanges(): Exchange[] {
       shortName: 'BIN-S',
       color: '#fbbf24',
       buyFeeType: 'percent' as FeeType,
-      buyFeeValue: 0.1, // 0.1% taker
+      buyFeeValue: 0.1,
+      buyTiers: [
+        // Tiers escalonados: mayor volumen = menor comisión
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 0.1 },
+        { minAmount: 50000, feeType: 'percent' as FeeType, feeValue: 0.08 },
+        { minAmount: 250000, feeType: 'percent' as FeeType, feeValue: 0.06 },
+      ],
       sellFeeType: 'percent' as FeeType,
       sellFeeValue: 0.1,
+      sellTiers: [
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 0.1 },
+        { minAmount: 50000, feeType: 'percent' as FeeType, feeValue: 0.08 },
+        { minAmount: 250000, feeType: 'percent' as FeeType, feeValue: 0.06 },
+      ],
       fixedFee: 0,
       fixedFeeCurrency: 'USDT',
+      // Descuento BNB del 25% sobre la comisión (típico de Binance)
+      discountPercent: 25,
+      discountLabel: 'Descuento BNB (25%)',
       isActive: true,
-      notes: 'Comisiones de spot trading (taker 0.1%). Con BNB descuento.',
+      notes: 'Comisiones de spot trading (VIP/tier según volumen 30d). Con BNB descuento del 25% sobre la comisión.',
       createdAt: now,
       updatedAt: now,
     },
@@ -295,7 +355,7 @@ export async function deleteBank(id: string): Promise<void> {
 
 function loadExchanges(): Exchange[] {
   ensureInit()
-  return readJSON<Exchange[]>(EXCHANGES_KEY, [])
+  return readJSON<Exchange[]>(EXCHANGES_KEY, []).map(migrateExchange)
 }
 
 function saveExchanges(exchanges: Exchange[]): void {
@@ -330,10 +390,14 @@ export async function createExchange(input: ExchangeInput): Promise<Exchange> {
     color: input.color,
     buyFeeType: input.buyFeeType,
     buyFeeValue: input.buyFeeValue,
+    buyTiers: input.buyTiers ?? [],
     sellFeeType: input.sellFeeType,
     sellFeeValue: input.sellFeeValue,
+    sellTiers: input.sellTiers ?? [],
     fixedFee: input.fixedFee ?? 0,
     fixedFeeCurrency: input.fixedFeeCurrency ?? 'USDT',
+    discountPercent: input.discountPercent ?? 0,
+    discountLabel: input.discountLabel ?? null,
     isActive: input.isActive ?? true,
     notes: input.notes ?? null,
     createdAt: now,
@@ -352,6 +416,9 @@ export async function updateExchange(id: string, input: Partial<ExchangeInput>):
     ...exchanges[idx],
     ...input,
     shortName: input.shortName !== undefined ? input.shortName ?? null : exchanges[idx].shortName,
+    buyTiers: input.buyTiers !== undefined ? input.buyTiers ?? [] : exchanges[idx].buyTiers ?? [],
+    sellTiers: input.sellTiers !== undefined ? input.sellTiers ?? [] : exchanges[idx].sellTiers ?? [],
+    discountLabel: input.discountLabel !== undefined ? input.discountLabel ?? null : exchanges[idx].discountLabel,
     notes: input.notes !== undefined ? input.notes ?? null : exchanges[idx].notes,
     updatedAt: new Date().toISOString(),
   }
@@ -376,20 +443,66 @@ export async function deleteExchange(id: string): Promise<void> {
 }
 
 /**
+ * Selecciona el tier aplicable para un monto dado.
+ * Si no hay tiers definidos, retorna null (usar feeType/feeValue base).
+ * Si hay tiers, retorna el de mayor minAmount <= totalFiat.
+ */
+function pickTier(tiers: FeeTier[], totalFiat: number): FeeTier | null {
+  if (!tiers || tiers.length === 0) return null
+  // Ordenar de mayor a menor minAmount y elegir el primero que aplique
+  const sorted = [...tiers].sort((a, b) => b.minAmount - a.minAmount)
+  for (const tier of sorted) {
+    if (totalFiat >= tier.minAmount) return tier
+  }
+  // Fallback al tier de menor minAmount (debería ser 0 normalmente)
+  return sorted[sorted.length - 1]
+}
+
+/**
  * Calcula la comisión que aplicaría un exchange a una operación dada.
- * Retorna desglose (base + fija) y total.
+ * Soporta:
+ *   - Tiers escalonados (si están definidos, reemplazan el fee base)
+ *   - Descuento VIP/BNB (porcentaje descontado de la comisión variable, NO de la fija)
+ *   - Comisión fija adicional
+ * Retorna desglose y total.
  */
 export function calculateFee(
   exchange: Exchange | null | undefined,
   type: TransactionType,
   totalFiat: number
-): { baseFee: number; fixedFee: number; total: number } {
-  if (!exchange) return { baseFee: 0, fixedFee: 0, total: 0 }
-  const feeType = type === 'compra' ? exchange.buyFeeType : exchange.sellFeeType
-  const feeValue = type === 'compra' ? exchange.buyFeeValue : exchange.sellFeeValue
-  const base = feeType === 'percent' ? (totalFiat * feeValue) / 100 : feeValue
-  const fixed = exchange.fixedFee || 0
-  return { baseFee: base, fixedFee: fixed, total: base + fixed }
+): { baseFee: number; discount: number; fixedFee: number; total: number } {
+  if (!exchange) return { baseFee: 0, discount: 0, fixedFee: 0, total: 0 }
+
+  const tiers = type === 'compra' ? exchange.buyTiers : exchange.sellTiers
+  const fallbackType = type === 'compra' ? exchange.buyFeeType : exchange.sellFeeType
+  const fallbackValue = type === 'compra' ? exchange.buyFeeValue : exchange.sellFeeValue
+
+  let baseFee: number
+  const tier = pickTier(tiers, totalFiat)
+  if (tier) {
+    baseFee = tier.feeType === 'percent'
+      ? (totalFiat * tier.feeValue) / 100
+      : tier.feeValue
+  } else {
+    baseFee = fallbackType === 'percent'
+      ? (totalFiat * fallbackValue) / 100
+      : fallbackValue
+  }
+
+  // Descuento VIP/BNB se aplica SOLO sobre la comisión variable (no sobre la fija)
+  const discountPercent = exchange.discountPercent || 0
+  const discount = (baseFee * discountPercent) / 100
+  const baseFeeAfterDiscount = baseFee - discount
+
+  const fixedFee = exchange.fixedFee || 0
+  const total = baseFeeAfterDiscount + fixedFee
+
+  return {
+    baseFee,
+    discount,
+    fixedFee,
+    total,
+  }
 }
 
 // =====================
@@ -516,12 +629,19 @@ export async function createTransaction(input: TransactionInput): Promise<Transa
   if (input.fee === undefined && exchange) {
     const calc = calculateFee(exchange, input.type, total)
     fee = calc.total
-    feeBreakdown = { baseFee: calc.baseFee, fixedFee: calc.fixedFee, total: calc.total }
-  } else if (exchange) {
-    // Si el usuario pasó fee manual y hay exchange, intentar reconstruir breakdown
-    const calc = calculateFee(exchange, input.type, total)
     feeBreakdown = {
-      baseFee: fee - calc.fixedFee,
+      baseFee: calc.baseFee,
+      discount: calc.discount,
+      fixedFee: calc.fixedFee,
+      total: calc.total,
+    }
+  } else if (exchange) {
+    // Si el usuario pasó fee manual y hay exchange, reconstruir breakdown aproximado
+    const calc = calculateFee(exchange, input.type, total)
+    const baseAfterDiscount = fee - calc.fixedFee
+    feeBreakdown = {
+      baseFee: calc.baseFee,
+      discount: Math.max(0, calc.baseFee - baseAfterDiscount),
       fixedFee: calc.fixedFee,
       total: fee,
     }
@@ -578,16 +698,27 @@ export async function updateTransaction(
     fee = input.fee
     if (exchange) {
       const calc = calculateFee(exchange, type, total)
-      feeBreakdown = { baseFee: fee - calc.fixedFee, fixedFee: calc.fixedFee, total: fee }
+      const baseAfterDiscount = fee - calc.fixedFee
+      feeBreakdown = {
+        baseFee: calc.baseFee,
+        discount: Math.max(0, calc.baseFee - baseAfterDiscount),
+        fixedFee: calc.fixedFee,
+        total: fee,
+      }
     } else {
-      feeBreakdown = { baseFee: fee, fixedFee: 0, total: fee }
+      feeBreakdown = { baseFee: fee, discount: 0, fixedFee: 0, total: fee }
     }
   } else if (input.exchangeId !== undefined || input.amount !== undefined || input.rate !== undefined || input.type !== undefined) {
     // Cambió algo que afecta el cálculo — recalcular si hay exchange
     if (exchange) {
       const calc = calculateFee(exchange, type, total)
       fee = calc.total
-      feeBreakdown = { baseFee: calc.baseFee, fixedFee: calc.fixedFee, total: calc.total }
+      feeBreakdown = {
+        baseFee: calc.baseFee,
+        discount: calc.discount,
+        fixedFee: calc.fixedFee,
+        total: calc.total,
+      }
     } else {
       fee = existing.fee
       feeBreakdown = null

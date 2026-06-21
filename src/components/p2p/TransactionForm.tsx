@@ -760,6 +760,45 @@ export function TransactionForm({
                   {formatCurrency(fee, watchedCurrency)}
                 </span>
               </div>
+              {/* Detalle de comisión cuando hay exchange seleccionado */}
+              {(() => {
+                if (!watchedExchangeId || watchedExchangeId === '__none') return null
+                const ex = exchanges.find((e) => e.id === watchedExchangeId)
+                if (!ex) return null
+                const calc = storage.calculateFee(ex, watchedType, total)
+                const tiers = watchedType === 'compra' ? ex.buyTiers : ex.sellTiers
+                const applicableTier = tiers && tiers.length > 0
+                  ? [...tiers].sort((a, b) => b.minAmount - a.minAmount).find((t) => total >= t.minAmount)
+                  : null
+                return (
+                  <div className="text-[11px] text-muted-foreground pl-2 border-l-2 border-amber-200 dark:border-amber-900 space-y-0.5">
+                    {applicableTier ? (
+                      <p>
+                        Tier aplicado: ≥ {formatNumber(applicableTier.minAmount, 0)} →{' '}
+                        {formatNumber(applicableTier.feeValue, 4)}
+                        {applicableTier.feeType === 'percent' ? '%' : ` ${watchedCurrency}`}
+                      </p>
+                    ) : (
+                      <p>
+                        Comisión base:{' '}
+                        {(watchedType === 'compra' ? ex.buyFeeType : ex.sellFeeType) === 'percent'
+                          ? `${formatNumber(watchedType === 'compra' ? ex.buyFeeValue : ex.sellFeeValue, 4)}%`
+                          : `${formatNumber(watchedType === 'compra' ? ex.buyFeeValue : ex.sellFeeValue, 4)} ${watchedCurrency}`}
+                      </p>
+                    )}
+                    {calc.discount > 0 && (
+                      <p className="text-violet-600 dark:text-violet-400">
+                        −{formatCurrency(calc.discount, watchedCurrency)} ({ex.discountLabel ?? `${ex.discountPercent}% off`})
+                      </p>
+                    )}
+                    {calc.fixedFee > 0 && (
+                      <p>
+                        +{formatCurrency(calc.fixedFee, watchedCurrency)} fija ({ex.fixedFeeCurrency})
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
               <div className="flex items-center justify-between text-sm pt-1.5 border-t border-emerald-200 dark:border-emerald-900">
                 <span className="font-medium">Total neto</span>
                 <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">

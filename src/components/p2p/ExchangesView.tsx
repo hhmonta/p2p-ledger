@@ -28,6 +28,7 @@ import {
   Percent,
   Coins,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react'
 import type { Exchange } from '@/lib/types'
 import { ExchangeForm } from './ExchangeForm'
@@ -176,20 +177,52 @@ export function ExchangesView() {
                       <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                         <Percent className="h-3 w-3" /> Compra
                       </span>
-                      <span className="tabular-nums font-medium">
-                        {e.buyFeeType === 'percent'
-                          ? `${formatNumber(e.buyFeeValue, 4)}%`
-                          : `${formatNumber(e.buyFeeValue, 4)} (fijo)`}
+                      <span className="tabular-nums font-medium text-right">
+                        {e.buyTiers && e.buyTiers.length > 0 ? (
+                          <span className="flex flex-col items-end">
+                            <span className="text-xs text-muted-foreground">
+                              {e.buyTiers.length} {e.buyTiers.length === 1 ? 'tier' : 'tiers'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatNumber(e.buyTiers[0].feeValue, 4)}
+                              {e.buyTiers[0].feeType === 'percent' ? '%' : ' fijo'} →{' '}
+                              {formatNumber(e.buyTiers[e.buyTiers.length - 1].feeValue, 4)}
+                              {e.buyTiers[e.buyTiers.length - 1].feeType === 'percent' ? '%' : ''}
+                            </span>
+                          </span>
+                        ) : (
+                          <>
+                            {e.buyFeeType === 'percent'
+                              ? `${formatNumber(e.buyFeeValue, 4)}%`
+                              : `${formatNumber(e.buyFeeValue, 4)} (fijo)`}
+                          </>
+                        )}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
                         <Percent className="h-3 w-3" /> Venta
                       </span>
-                      <span className="tabular-nums font-medium">
-                        {e.sellFeeType === 'percent'
-                          ? `${formatNumber(e.sellFeeValue, 4)}%`
-                          : `${formatNumber(e.sellFeeValue, 4)} (fijo)`}
+                      <span className="tabular-nums font-medium text-right">
+                        {e.sellTiers && e.sellTiers.length > 0 ? (
+                          <span className="flex flex-col items-end">
+                            <span className="text-xs text-muted-foreground">
+                              {e.sellTiers.length} {e.sellTiers.length === 1 ? 'tier' : 'tiers'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatNumber(e.sellTiers[0].feeValue, 4)}
+                              {e.sellTiers[0].feeType === 'percent' ? '%' : ' fijo'} →{' '}
+                              {formatNumber(e.sellTiers[e.sellTiers.length - 1].feeValue, 4)}
+                              {e.sellTiers[e.sellTiers.length - 1].feeType === 'percent' ? '%' : ''}
+                            </span>
+                          </span>
+                        ) : (
+                          <>
+                            {e.sellFeeType === 'percent'
+                              ? `${formatNumber(e.sellFeeValue, 4)}%`
+                              : `${formatNumber(e.sellFeeValue, 4)} (fijo)`}
+                          </>
+                        )}
                       </span>
                     </div>
                     {e.fixedFee > 0 && (
@@ -199,6 +232,17 @@ export function ExchangesView() {
                         </span>
                         <span className="tabular-nums font-medium">
                           {formatNumber(e.fixedFee, 4)} {e.fixedFeeCurrency}
+                        </span>
+                      </div>
+                    )}
+                    {e.discountPercent > 0 && (
+                      <div className="flex items-center justify-between text-sm pt-1 border-t">
+                        <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
+                          <Sparkles className="h-3 w-3" />
+                          {e.discountLabel ?? 'Descuento'}
+                        </span>
+                        <span className="tabular-nums font-medium text-violet-600 dark:text-violet-400">
+                          −{formatNumber(e.discountPercent, 2)}%
                         </span>
                       </div>
                     )}
