@@ -5,8 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dashboard } from '@/components/p2p/Dashboard'
 import { BanksView } from '@/components/p2p/BanksView'
+import { ExchangesView } from '@/components/p2p/ExchangesView'
 import { TransactionsView } from '@/components/p2p/TransactionsView'
-import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered } from 'lucide-react'
+import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered, Building2 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 const queryClient = new QueryClient({
@@ -36,7 +37,7 @@ export default function Home() {
                   P2P Ledger
                 </h1>
                 <p className="text-xs text-muted-foreground hidden sm:block">
-                  Compras · Ventas · Bancos
+                  Compras · Ventas · Bancos · Comisiones
                 </p>
               </div>
             </div>
@@ -52,7 +53,7 @@ export default function Home() {
         {/* Main */}
         <main className="container mx-auto px-4 py-6 flex-1 w-full">
           <Tabs value={tab} onValueChange={setTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 mb-6 h-auto">
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto">
               <TabsTrigger value="dashboard" className="flex items-center gap-1.5 py-2 text-xs sm:text-sm">
                 <LayoutDashboard className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -62,6 +63,11 @@ export default function Home() {
                 <Landmark className="h-3.5 w-3.5" />
                 Bancos
               </TabsTrigger>
+              <TabsTrigger value="exchanges" className="flex items-center gap-1.5 py-2 text-xs sm:text-sm">
+                <Building2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Exchanges</span>
+                <span className="sm:hidden">Comm.</span>
+              </TabsTrigger>
               <TabsTrigger value="compras" className="flex items-center gap-1.5 py-2 text-xs sm:text-sm">
                 <ShoppingCart className="h-3.5 w-3.5" />
                 Compras
@@ -70,7 +76,7 @@ export default function Home() {
                 <Tag className="h-3.5 w-3.5" />
                 Ventas
               </TabsTrigger>
-              <TabsTrigger value="todas" className="flex items-center gap-1.5 py-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
+              <TabsTrigger value="todas" className="flex items-center gap-1.5 py-2 text-xs sm:text-sm col-span-3 sm:col-span-1">
                 <ListOrdered className="h-3.5 w-3.5" />
                 Historial
               </TabsTrigger>
@@ -81,6 +87,9 @@ export default function Home() {
             </TabsContent>
             <TabsContent value="bancos" className="mt-0">
               <BanksView />
+            </TabsContent>
+            <TabsContent value="exchanges" className="mt-0">
+              <ExchangesView />
             </TabsContent>
             <TabsContent value="compras" className="mt-0">
               <TransactionsView mode="compra" />

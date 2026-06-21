@@ -46,9 +46,11 @@ import {
   AlertCircle,
   Filter,
   Inbox,
+  Building2,
 } from 'lucide-react'
 import type {
   Bank,
+  Exchange,
   Transaction,
   TransactionType,
   TransactionStatus,
@@ -80,24 +82,30 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [bankFilter, setBankFilter] = useState<string>('all')
+  const [exchangeFilter, setExchangeFilter] = useState<string>('all')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState<Transaction | null>(null)
 
-  // Cargar bancos para el filtro y el form
+  // Cargar bancos y exchanges
   const { data: banks = [] } = useQuery<Bank[]>({
     queryKey: ['banks'],
     queryFn: () => storage.listBanks(),
   })
 
-  // Construir filtros
+  const { data: exchanges = [] } = useQuery<Exchange[]>({
+    queryKey: ['exchanges'],
+    queryFn: () => storage.listExchanges(),
+  })
+
   const filters = useMemo(
     () => ({
       type: mode !== 'all' ? (mode as TransactionType) : undefined,
       status: statusFilter !== 'all' ? (statusFilter as TransactionStatus) : undefined,
       bankId: bankFilter !== 'all' ? bankFilter : undefined,
+      exchangeId: exchangeFilter !== 'all' ? exchangeFilter : undefined,
     }),
-    [mode, statusFilter, bankFilter]
+    [mode, statusFilter, bankFilter, exchangeFilter]
   )
 
   const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
@@ -105,7 +113,6 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
     queryFn: () => storage.listTransactions(filters),
   })
 
-  // Filtro por texto (contraparte, referencia, asset) en cliente
   const filtered = transactions.filter((t) => {
     const q = search.toLowerCase().trim()
     if (!q) return true
@@ -117,16 +124,18 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
     )
   })
 
-  // KPIs del conjunto filtrado (sin importar status filter opcional)
+  // KPIs
   const completadas = filtered.filter((t) => t.status === 'completada')
   const totalMonto = completadas.reduce((s, t) => s + t.amount, 0)
   const totalFiat = completadas.reduce((s, t) => s + t.total, 0)
   const totalFees = completadas.reduce((s, t) => s + t.fee, 0)
+  const totalNeto = completadas.reduce((s, t) => s + (t.netTotal ?? t.total - t.fee), 0)
   const tasaPromedio = totalMonto > 0 ? totalFiat / totalMonto : 0
 
   async function refetch() {
     await queryClient.invalidateQueries({ queryKey: ['transactions'] })
     await queryClient.invalidateQueries({ queryKey: ['banks'] })
+    await queryClient.invalidateQueries({ queryKey: ['exchanges'] })
     await queryClient.invalidateQueries({ queryKey: ['stats'] })
   }
 
@@ -191,15 +200,7 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Volumen activo</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
-              {formatNumber(totalMonto, 2)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Volumen fiat</CardDescription>
+            <CardDescription>Volumen bruto</CardDescription>
             <CardTitle className="text-2xl tabular-nums">
               {formatCurrency(totalFiat)}
             </CardTitle>
@@ -207,9 +208,19 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Tasa promedio</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
-              {formatNumber(tasaPromedio, 2)}
+            <CardDescription className="flex items-center gap-1">
+              <Building2 className="h-3 w-3 text-amber-500" /> Comisiones
+            </CardDescription>
+            <CardTitle className="text-2xl tabular-nums text-amber-600 dark:text-amber-400">
+              {formatCurrency(totalFees)}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Volumen neto</CardDescription>
+            <CardTitle className="text-2xl tabular-nums text-emerald-600 dark:text-emerald-400">
+              {formatCurrency(totalNeto)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -243,7 +254,7 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="w-full sm:w-40">
             <Filter className="mr-1 h-3.5 w-3.5" />
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
@@ -255,7 +266,7 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
           </SelectContent>
         </Select>
         <Select value={bankFilter} onValueChange={setBankFilter}>
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Banco" />
           </SelectTrigger>
           <SelectContent>
@@ -267,13 +278,21 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
             ))}
           </SelectContent>
         </Select>
+        <Select value={exchangeFilter} onValueChange={setExchangeFilter}>
+          <SelectTrigger className="w-full sm:w-44">
+            <SelectValue placeholder="Exchange" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los exchanges</SelectItem>
+            <SelectItem value="__none__">Sin exchange</SelectItem>
+            {exchanges.map((e) => (
+              <SelectItem key={e.id} value={e.id}>
+                {e.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-
-      {totalFees > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Comisiones acumuladas (completadas): {formatCurrency(totalFees)}
-        </p>
-      )}
 
       {/* Tabla */}
       <Card>
@@ -289,11 +308,11 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
               <Inbox className="h-12 w-12 text-muted-foreground/50 mb-3" />
               <p className="font-medium">No hay transacciones</p>
               <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                {search || statusFilter !== 'all' || bankFilter !== 'all'
+                {search || statusFilter !== 'all' || bankFilter !== 'all' || exchangeFilter !== 'all'
                   ? 'No se encontraron resultados con los filtros actuales.'
                   : `Registra tu primera ${mode === 'venta' ? 'venta' : mode === 'compra' ? 'compra' : 'operación'} para empezar a llevar el control.`}
               </p>
-              {!search && statusFilter === 'all' && bankFilter === 'all' && (
+              {!search && statusFilter === 'all' && bankFilter === 'all' && exchangeFilter === 'all' && (
                 <Button onClick={openNew} className="mt-4">
                   <Plus className="mr-1 h-4 w-4" />
                   {mode === 'venta' ? 'Registrar venta' : 'Registrar compra'}
@@ -308,9 +327,12 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
                     <TableHead className="w-[100px]">Tipo</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Contraparte</TableHead>
+                    <TableHead>Exchange</TableHead>
                     <TableHead className="text-right">Activo</TableHead>
                     <TableHead className="text-right">Tasa</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Bruto</TableHead>
+                    <TableHead className="text-right">Comisión</TableHead>
+                    <TableHead className="text-right">Neto</TableHead>
                     <TableHead>Bancos</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="w-[80px]"></TableHead>
@@ -344,6 +366,23 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
                           </div>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {t.exchange ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                            style={{ backgroundColor: `${t.exchange.color}22` }}
+                            title={t.exchange.name}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: t.exchange.color }}
+                            />
+                            {t.exchange.shortName ?? t.exchange.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums whitespace-nowrap">
                         <div className="font-medium">
                           {formatNumber(t.amount, 2)}{' '}
@@ -351,11 +390,6 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
                             {t.asset}
                           </span>
                         </div>
-                        {t.fee > 0 && (
-                          <div className="text-xs text-amber-600">
-                            +{formatCurrency(t.fee, t.currency)}
-                          </div>
-                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-sm">
                         {formatNumber(t.rate, 2)}
@@ -363,21 +397,29 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
                       <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
                         {formatCurrency(t.total, t.currency)}
                       </TableCell>
+                      <TableCell className="text-right tabular-nums text-xs whitespace-nowrap">
+                        {t.fee > 0 ? (
+                          <span className="text-amber-600 dark:text-amber-400">
+                            −{formatCurrency(t.fee, t.currency)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-xs">
                           {t.fromBank ? (
                             <span
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
-                              style={{
-                                backgroundColor: `${t.fromBank.color}22`,
-                              }}
+                              style={{ backgroundColor: `${t.fromBank.color}22` }}
                               title={`Origen: ${t.fromBank.name}`}
                             >
                               <span
                                 className="w-1.5 h-1.5 rounded-full"
-                                style={{
-                                  backgroundColor: t.fromBank.color,
-                                }}
+                                style={{ backgroundColor: t.fromBank.color }}
                               />
                               {t.fromBank.name}
                             </span>
@@ -389,16 +431,12 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
                               <span className="text-muted-foreground">→</span>
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
-                                style={{
-                                  backgroundColor: `${t.toBank.color}22`,
-                                }}
+                                style={{ backgroundColor: `${t.toBank.color}22` }}
                                 title={`Destino: ${t.toBank.name}`}
                               >
                                 <span
                                   className="w-1.5 h-1.5 rounded-full"
-                                  style={{
-                                    backgroundColor: t.toBank.color,
-                                  }}
+                                  style={{ backgroundColor: t.toBank.color }}
                                 />
                                 {t.toBank.name}
                               </span>

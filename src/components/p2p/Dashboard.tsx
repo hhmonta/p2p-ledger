@@ -20,8 +20,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
 } from 'recharts'
 import {
   TrendingUp,
@@ -33,12 +31,14 @@ import {
   Users,
   Clock,
   Trophy,
+  Building2,
+  Percent,
 } from 'lucide-react'
 import type { Stats } from '@/lib/types'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import * as storage from '@/lib/storage'
 
-const PIE_COLORS = ['#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444']
+const PIE_COLORS = ['#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#3b82f6', '#84cc16']
 
 export function Dashboard() {
   const { data: stats, isLoading } = useQuery<Stats>({
@@ -74,11 +74,14 @@ export function Dashboard() {
   })
 
   const gananciaColor =
-    r.gananciaEstimada > 0
+    r.gananciaNeta > 0
       ? 'text-emerald-600 dark:text-emerald-400'
-      : r.gananciaEstimada < 0
+      : r.gananciaNeta < 0
         ? 'text-rose-600 dark:text-rose-400'
         : 'text-muted-foreground'
+
+  const totalFees = r.feesCompras + r.feesVentas
+  const totalNeto = r.netCompras + r.netVentas
 
   return (
     <div className="space-y-6">
@@ -86,7 +89,7 @@ export function Dashboard() {
       <div>
         <h2 className="text-xl font-semibold">Resumen general</h2>
         <p className="text-sm text-muted-foreground">
-          Visión global de tu actividad P2P: volumen, tasas y ganancia estimada.
+          Visión global de tu actividad P2P: volumen, comisiones, tasas y ganancia neta.
         </p>
       </div>
 
@@ -102,8 +105,7 @@ export function Dashboard() {
               {formatCurrency(r.totalCompras)}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {r.cantidadCompras} operaciones · {formatNumber(r.montoCompras)}{' '}
-              unidades
+              {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} unidades
             </p>
           </CardHeader>
         </Card>
@@ -117,8 +119,7 @@ export function Dashboard() {
               {formatCurrency(r.totalVentas)}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {r.cantidadVentas} operaciones · {formatNumber(r.montoVentas)}{' '}
-              unidades
+              {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} unidades
             </p>
           </CardHeader>
         </Card>
@@ -126,13 +127,13 @@ export function Dashboard() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <PiggyBank className="h-3 w-3" />
-              Ganancia estimada
+              Ganancia neta
             </CardDescription>
             <CardTitle className={`text-xl sm:text-2xl tabular-nums ${gananciaColor}`}>
-              {formatCurrency(r.gananciaEstimada)}
+              {formatCurrency(r.gananciaNeta)}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Spread × volumen cruzado − comisiones
+              Spread × volumen − comisiones
             </p>
           </CardHeader>
         </Card>
@@ -185,9 +186,7 @@ export function Dashboard() {
             <CardTitle className="text-lg tabular-nums">
               {formatNumber(r.activoNeto, 2)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Comprado − vendido
-            </p>
+            <p className="text-xs text-muted-foreground">Comprado − vendido</p>
           </CardHeader>
         </Card>
         <Card>
@@ -205,12 +204,45 @@ export function Dashboard() {
             >
               {formatNumber(r.avgRateVenta - r.avgRateCompra, 2)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Venta − compra
-            </p>
+            <p className="text-xs text-muted-foreground">Venta − compra</p>
           </CardHeader>
         </Card>
       </div>
+
+      {/* Comisiones: bloque destacado */}
+      <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Percent className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total comisiones</p>
+                <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                  {formatCurrency(totalFees)}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 flex-1 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">En compras</p>
+                <p className="font-medium tabular-nums">{formatCurrency(r.feesCompras)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">En ventas</p>
+                <p className="font-medium tabular-nums">{formatCurrency(r.feesVentas)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Volumen neto</p>
+                <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(totalNeto)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -246,6 +278,59 @@ export function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Comisiones por exchange */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-amber-500" />
+              Comisiones por exchange
+            </CardTitle>
+            <CardDescription>Desglose de comisiones pagadas por plataforma</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.feesPorExchange.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Aún no hay comisiones registradas
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {stats.feesPorExchange.map((f) => {
+                  const max = stats.feesPorExchange[0]?.totalFees || 1
+                  const pct = max > 0 ? (f.totalFees / max) * 100 : 0
+                  return (
+                    <div key={f.exchangeId ?? 'none'} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2 truncate">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: f.exchangeColor }}
+                          />
+                          <span className="font-medium truncate">{f.exchangeName}</span>
+                        </span>
+                        <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400">
+                          {formatCurrency(f.totalFees)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: f.exchangeColor,
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {f.count} ops · {f.compras} compras · {f.ventas} ventas
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -304,7 +389,7 @@ export function Dashboard() {
         </Card>
 
         {/* Activos negociados */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Coins className="h-4 w-4" />
@@ -390,13 +475,14 @@ export function Dashboard() {
           <div className="flex items-start gap-3 text-sm">
             <Users className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-medium">Cómo se calcula la ganancia estimada</p>
+              <p className="font-medium">Cómo se calcula la ganancia neta</p>
               <p className="text-muted-foreground">
-                Tomamos la diferencia entre la tasa promedio de venta y la de
-                compra, multiplicada por el volumen cruzado (mínimo entre lo
-                comprado y lo vendido), menos las comisiones acumuladas. Es una
-                estimación: para un cálculo exacto registra cada operación con su
-                banco y tasa específica.
+                Tomamos la diferencia entre la tasa promedio de venta y la de compra,
+                multiplicada por el volumen cruzado (mínimo entre lo comprado y vendido),
+                y le restamos todas las comisiones acumuladas (de compra, venta y fijas
+                de cada exchange). Esto te da una estimación real de cuánto ganaste
+                después de costos. Para un cálculo exacto registra cada operación con su
+                exchange y tasa específica.
               </p>
             </div>
           </div>

@@ -31,9 +31,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, ArrowRight } from 'lucide-react'
+import { Loader2, ArrowRight, Sparkles, Lock, Unlock } from 'lucide-react'
 import type {
   Bank,
+  Exchange,
   Transaction,
   TransactionInput,
   TransactionType,
@@ -52,6 +53,7 @@ const txSchema = z.object({
   currency: z.string().min(1),
   fromBankId: z.string().optional().nullable(),
   toBankId: z.string().optional().nullable(),
+  exchangeId: z.string().optional().nullable(),
   status: z.enum(['pendiente', 'completada', 'cancelada']),
   reference: z.string().optional(),
   fee: z.coerce.number().min(0).default(0),
@@ -82,8 +84,16 @@ export function TransactionForm({
   onSaved,
 }: TransactionFormProps) {
   const [submitting, setSubmitting] = useState(false)
+  const [exchanges, setExchanges] = useState<Exchange[]>([])
+  const [feeLocked, setFeeLocked] = useState(false) // si true, el fee NO se recalcula al cambiar inputs
 
   const activeBanks = useMemo(() => banks.filter((b) => b.isActive), [banks])
+  const activeExchanges = useMemo(() => exchanges.filter((e) => e.isActive), [exchanges])
+
+  // Cargar exchanges
+  useEffect(() => {
+    storage.listExchanges().then(setExchanges).catch(() => {})
+  }, [open])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(txSchema),
@@ -96,6 +106,7 @@ export function TransactionForm({
       currency: 'VES',
       fromBankId: null,
       toBankId: null,
+      exchangeId: null,
       status: 'completada',
       reference: '',
       fee: 0,
@@ -116,12 +127,15 @@ export function TransactionForm({
           currency: transaction.currency,
           fromBankId: transaction.fromBankId ?? null,
           toBankId: transaction.toBankId ?? null,
+          exchangeId: transaction.exchangeId ?? null,
           status: transaction.status,
           reference: transaction.reference ?? '',
           fee: transaction.fee,
           date: toDateTimeInputValue(transaction.date),
           notes: transaction.notes ?? '',
         })
+        // Al editar, consideramos el fee como bloqueado (es el valor guardado)
+        setFeeLocked(true)
       } else {
         form.reset({
           type: defaultType,
@@ -132,12 +146,14 @@ export function TransactionForm({
           currency: 'VES',
           fromBankId: null,
           toBankId: null,
+          exchangeId: null,
           status: 'completada',
           reference: '',
           fee: 0,
           date: toDateTimeInputValue(new Date()),
           notes: '',
         })
+        setFeeLocked(false)
       }
     }
   }, [open, transaction, defaultType, form])
@@ -147,8 +163,39 @@ export function TransactionForm({
   const watchedCurrency = form.watch('currency')
   const watchedAsset = form.watch('asset')
   const watchedType = form.watch('type')
+  const watchedExchangeId = form.watch('exchangeId')
+  const watchedFee = form.watch('fee')
 
   const total = (Number(watchedAmount) || 0) * (Number(watchedRate) || 0)
+
+  // Cálculo automático de comisión cuando cambia exchange, monto, tasa o tipo
+  // (solo si el fee NO está bloqueado manualmente)
+  useEffect(() => {
+    if (feeLocked) return
+    if (!watchedExchangeId || watchedExchangeId === '__none') {
+      form.setValue('fee', 0)
+      return
+    }
+    const ex = exchanges.find((e) => e.id === watchedExchangeId)
+    if (!ex) return
+    const calc = storage.calculateFee(ex, watchedType, total)
+    form.setValue('fee', Number(calc.total.toFixed(6)))
+  }, [watchedExchangeId, watchedAmount, watchedRate, watchedType, exchanges, total, feeLocked, form])
+
+  // Al cambiar de exchange manualmente, desbloquear fee para recalcular
+  function handleExchangeChange(v: string) {
+    const value = v === '__none' ? null : v
+    form.setValue('exchangeId', value)
+    setFeeLocked(false) // si cambias exchange, se recalcula
+  }
+
+  function unlockFee() {
+    setFeeLocked(false)
+  }
+
+  function lockFee() {
+    setFeeLocked(true)
+  }
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true)
@@ -162,6 +209,7 @@ export function TransactionForm({
         currency: values.currency,
         fromBankId: values.fromBankId || null,
         toBankId: values.toBankId || null,
+        exchangeId: values.exchangeId || null,
         status: values.status,
         reference: values.reference || null,
         fee: Number(values.fee),
@@ -196,9 +244,13 @@ export function TransactionForm({
     }
   }
 
+  // Neto (total menos comisión)
+  const fee = Number(watchedFee) || 0
+  const netTotal = total - fee
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[640px] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {transaction
@@ -226,7 +278,10 @@ export function TransactionForm({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => field.onChange('compra')}
+                      onClick={() => {
+                        field.onChange('compra')
+                        setFeeLocked(false) // recalcular fee con nuevo tipo
+                      }}
                       className={`rounded-lg border-2 p-3 text-sm font-medium transition ${
                         field.value === 'compra'
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
@@ -237,7 +292,10 @@ export function TransactionForm({
                     </button>
                     <button
                       type="button"
-                      onClick={() => field.onChange('venta')}
+                      onClick={() => {
+                        field.onChange('venta')
+                        setFeeLocked(false)
+                      }}
                       className={`rounded-lg border-2 p-3 text-sm font-medium transition ${
                         field.value === 'venta'
                           ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
@@ -265,6 +323,58 @@ export function TransactionForm({
                         {...field}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* EXCHANGE */}
+              <FormField
+                control={form.control}
+                name="exchangeId"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                      Exchange / Plataforma
+                    </FormLabel>
+                    <Select
+                      onValueChange={handleExchangeChange}
+                      value={field.value ?? '__none'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sin exchange específico" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none">Sin exchange (manual)</SelectItem>
+                        {activeExchanges.map((e) => (
+                          <SelectItem key={e.id} value={e.id}>
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="inline-block w-2 h-2 rounded-full"
+                                style={{ backgroundColor: e.color }}
+                              />
+                              {e.name}
+                              <span className="text-xs text-muted-foreground ml-1">
+                                {watchedType === 'compra'
+                                  ? e.buyFeeType === 'percent'
+                                    ? `${e.buyFeeValue}%`
+                                    : `fijo ${e.buyFeeValue}`
+                                  : e.sellFeeType === 'percent'
+                                    ? `${e.sellFeeValue}%`
+                                    : `fijo ${e.sellFeeValue}`}
+                              </span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Selecciona el exchange para calcular la comisión automáticamente. Puedes
+                      ajustarla después.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -361,7 +471,7 @@ export function TransactionForm({
               {/* Total calculado */}
               <div className="sm:col-span-2 rounded-lg bg-muted p-3 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  Total ({watchedCurrency})
+                  Total bruto ({watchedCurrency})
                 </span>
                 <span className="font-semibold tabular-nums">
                   {formatCurrency(total, watchedCurrency)}
@@ -594,12 +704,31 @@ export function TransactionForm({
                 )}
               />
 
+              {/* Comisión con toggle de bloqueo */}
               <FormField
                 control={form.control}
                 name="fee"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Comisión ({watchedCurrency})</FormLabel>
+                    <FormLabel className="flex items-center justify-between">
+                      <span>Comisión ({watchedCurrency})</span>
+                      <button
+                        type="button"
+                        onClick={feeLocked ? unlockFee : lockFee}
+                        className="text-xs flex items-center gap-1 px-2 py-0.5 rounded border hover:bg-muted"
+                        title={feeLocked ? 'Desbloquear para recalcular automáticamente' : 'Bloquear valor manual'}
+                      >
+                        {feeLocked ? (
+                          <>
+                            <Lock className="h-3 w-3" /> Manual
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="h-3 w-3" /> Auto
+                          </>
+                        )}
+                      </button>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -608,10 +737,35 @@ export function TransactionForm({
                         {...field}
                       />
                     </FormControl>
+                    <FormDescription>
+                      {watchedExchangeId && watchedExchangeId !== '__none'
+                        ? `Calculada automáticamente según el exchange. ${feeLocked ? 'Bloqueada manualmente.' : 'Se recalcula al cambiar monto/tasa.'}`
+                        : 'Ingresa la comisión manualmente o selecciona un exchange para calcularla.'}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Resumen neto */}
+            <div className="rounded-lg border-2 border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-3 space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total bruto</span>
+                <span className="tabular-nums">{formatCurrency(total, watchedCurrency)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-amber-600 dark:text-amber-400">− Comisión</span>
+                <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                  {formatCurrency(fee, watchedCurrency)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm pt-1.5 border-t border-emerald-200 dark:border-emerald-900">
+                <span className="font-medium">Total neto</span>
+                <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(netTotal, watchedCurrency)}
+                </span>
+              </div>
             </div>
 
             <FormField

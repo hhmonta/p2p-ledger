@@ -5,18 +5,22 @@
 import type {
   Bank,
   BankInput,
+  Exchange,
+  ExchangeInput,
   Transaction,
   TransactionInput,
   TransactionType,
   TransactionStatus,
+  FeeType,
   Stats,
 } from './types'
 
 const BANKS_KEY = 'p2p:banks'
 const TX_KEY = 'p2p:transactions'
+const EXCHANGES_KEY = 'p2p:exchanges'
 const VERSION_KEY = 'p2p:version'
 
-const CURRENT_VERSION = '1'
+const CURRENT_VERSION = '2'
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -65,9 +69,101 @@ function ensureInit() {
   initialized = true
   const version = window.localStorage.getItem(VERSION_KEY)
   if (version !== CURRENT_VERSION) {
-    // Primera instalación o upgrade — no sobrescribimos si ya hay datos
     window.localStorage.setItem(VERSION_KEY, CURRENT_VERSION)
+    // Sembrar exchanges por defecto si no hay ninguno
+    const existing = window.localStorage.getItem(EXCHANGES_KEY)
+    if (!existing) {
+      const defaults = defaultExchanges()
+      writeJSON(EXCHANGES_KEY, defaults)
+    }
   }
+}
+
+// Exchanges preconfigurados con comisiones típicas del mercado P2P
+function defaultExchanges(): Exchange[] {
+  const now = new Date().toISOString()
+  return [
+    {
+      id: uid(),
+      name: 'Binance P2P',
+      shortName: 'BIN',
+      color: '#f0b90b',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0, // Binance P2P normalmente no cobra al comprador
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0,
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      isActive: true,
+      notes: 'Binance P2P no cobra comisión de taker directamente en la operación P2P. Aplican comisiones de retiro del activo.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'OKX P2P',
+      shortName: 'OKX',
+      color: '#000000',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0,
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      isActive: true,
+      notes: 'OKX P2P tampoco cobra comisión directa al usuario en operaciones P2P.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'Mercado Libre',
+      shortName: 'ML',
+      color: '#ffe600',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 8, // ML cobra ~8% al vendedor
+      fixedFee: 0,
+      fixedFeeCurrency: 'VES',
+      isActive: true,
+      notes: 'Mercado Libre cobra comisión al vendedor (~8% en VE). El comprador no paga.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'PayPal',
+      shortName: 'PP',
+      color: '#0070ba',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 4.4, // Comercial跨境 ~4.4%
+      fixedFee: 0.3,
+      fixedFeeCurrency: 'USD',
+      isActive: true,
+      notes: 'PayPal cobra comisión al receptor (4.4% + $0.30 fijo en transacciones comerciales internacionales).',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'Binance Spot',
+      shortName: 'BIN-S',
+      color: '#fbbf24',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0.1, // 0.1% taker
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0.1,
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      isActive: true,
+      notes: 'Comisiones de spot trading (taker 0.1%). Con BNB descuento.',
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
 }
 
 // =====================
@@ -97,12 +193,15 @@ function computeBankBalance(bank: Bank, transactions: Transaction[]): {
   let countTo = 0
   for (const t of transactions) {
     if (t.status !== 'completada') continue
+    // Para el cálculo del balance del banco usamos el neto (después de comisiones)
+    // porque la comisión es un costo que se descuenta del monto que efectivamente entra/sale.
+    const neto = t.netTotal ?? t.total
     if (t.toBankId === bank.id) {
-      entrada += t.total
+      entrada += neto
       countTo++
     }
     if (t.fromBankId === bank.id) {
-      salida += t.total
+      salida += neto
       countFrom++
     }
   }
@@ -176,8 +275,7 @@ export async function updateBank(id: string, input: Partial<BankInput>): Promise
 
 export async function deleteBank(id: string): Promise<void> {
   const banks = loadBanks()
-  const filtered = banks.filter((b) => b.id !== id)
-  saveBanks(filtered)
+  saveBanks(banks.filter((b) => b.id !== id))
   // Desvincular transacciones
   const transactions = loadTransactions()
   let changed = false
@@ -189,6 +287,109 @@ export async function deleteBank(id: string): Promise<void> {
     }
   }
   if (changed) saveTransactions(transactions)
+}
+
+// =====================
+// Exchanges
+// =====================
+
+function loadExchanges(): Exchange[] {
+  ensureInit()
+  return readJSON<Exchange[]>(EXCHANGES_KEY, [])
+}
+
+function saveExchanges(exchanges: Exchange[]): void {
+  writeJSON(EXCHANGES_KEY, exchanges)
+  notify()
+}
+
+export async function listExchanges(): Promise<Exchange[]> {
+  const exchanges = loadExchanges()
+  const transactions = loadTransactions()
+  return exchanges
+    .sort((a, b) => {
+      // Activos primero, luego por nombre
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+    .map((e) => ({
+      ...e,
+      _count: {
+        transactions: transactions.filter((t) => t.exchangeId === e.id).length,
+      },
+    }))
+}
+
+export async function createExchange(input: ExchangeInput): Promise<Exchange> {
+  const exchanges = loadExchanges()
+  const now = new Date().toISOString()
+  const exchange: Exchange = {
+    id: uid(),
+    name: input.name,
+    shortName: input.shortName ?? null,
+    color: input.color,
+    buyFeeType: input.buyFeeType,
+    buyFeeValue: input.buyFeeValue,
+    sellFeeType: input.sellFeeType,
+    sellFeeValue: input.sellFeeValue,
+    fixedFee: input.fixedFee ?? 0,
+    fixedFeeCurrency: input.fixedFeeCurrency ?? 'USDT',
+    isActive: input.isActive ?? true,
+    notes: input.notes ?? null,
+    createdAt: now,
+    updatedAt: now,
+  }
+  exchanges.push(exchange)
+  saveExchanges(exchanges)
+  return exchange
+}
+
+export async function updateExchange(id: string, input: Partial<ExchangeInput>): Promise<Exchange> {
+  const exchanges = loadExchanges()
+  const idx = exchanges.findIndex((e) => e.id === id)
+  if (idx === -1) throw new Error('Exchange no encontrado')
+  const updated: Exchange = {
+    ...exchanges[idx],
+    ...input,
+    shortName: input.shortName !== undefined ? input.shortName ?? null : exchanges[idx].shortName,
+    notes: input.notes !== undefined ? input.notes ?? null : exchanges[idx].notes,
+    updatedAt: new Date().toISOString(),
+  }
+  exchanges[idx] = updated
+  saveExchanges(exchanges)
+  return updated
+}
+
+export async function deleteExchange(id: string): Promise<void> {
+  const exchanges = loadExchanges()
+  saveExchanges(exchanges.filter((e) => e.id !== id))
+  // Desvincular transacciones (conservando fee aplicado)
+  const transactions = loadTransactions()
+  let changed = false
+  for (const t of transactions) {
+    if (t.exchangeId === id) {
+      t.exchangeId = null
+      changed = true
+    }
+  }
+  if (changed) saveTransactions(transactions)
+}
+
+/**
+ * Calcula la comisión que aplicaría un exchange a una operación dada.
+ * Retorna desglose (base + fija) y total.
+ */
+export function calculateFee(
+  exchange: Exchange | null | undefined,
+  type: TransactionType,
+  totalFiat: number
+): { baseFee: number; fixedFee: number; total: number } {
+  if (!exchange) return { baseFee: 0, fixedFee: 0, total: 0 }
+  const feeType = type === 'compra' ? exchange.buyFeeType : exchange.sellFeeType
+  const feeValue = type === 'compra' ? exchange.buyFeeValue : exchange.sellFeeValue
+  const base = feeType === 'percent' ? (totalFiat * feeValue) / 100 : feeValue
+  const fixed = exchange.fixedFee || 0
+  return { baseFee: base, fixedFee: fixed, total: base + fixed }
 }
 
 // =====================
@@ -205,10 +406,22 @@ function saveTransactions(transactions: Transaction[]): void {
   notify()
 }
 
+// Migra transacciones antiguas (sin netTotal ni exchangeId) al esquema nuevo
+function migrateTx(t: Transaction): Transaction {
+  if (t.netTotal === undefined) {
+    t.netTotal = t.total - (t.fee || 0)
+  }
+  if (t.exchangeId === undefined) {
+    t.exchangeId = null
+  }
+  return t
+}
+
 export interface TransactionFilters {
   type?: TransactionType
   status?: TransactionStatus
   bankId?: string
+  exchangeId?: string
   counterparty?: string
   from?: string
   to?: string
@@ -218,7 +431,9 @@ export interface TransactionFilters {
 export async function listTransactions(filters: TransactionFilters = {}): Promise<Transaction[]> {
   const banks = loadBanks()
   const bankMap = new Map(banks.map((b) => [b.id, b]))
-  let transactions = loadTransactions()
+  const exchanges = loadExchanges()
+  const exMap = new Map(exchanges.map((e) => [e.id, e]))
+  let transactions = loadTransactions().map(migrateTx)
 
   if (filters.type) transactions = transactions.filter((t) => t.type === filters.type)
   if (filters.status) transactions = transactions.filter((t) => t.status === filters.status)
@@ -226,6 +441,13 @@ export async function listTransactions(filters: TransactionFilters = {}): Promis
     transactions = transactions.filter(
       (t) => t.fromBankId === filters.bankId || t.toBankId === filters.bankId
     )
+  if (filters.exchangeId) {
+    if (filters.exchangeId === '__none__') {
+      transactions = transactions.filter((t) => !t.exchangeId)
+    } else {
+      transactions = transactions.filter((t) => t.exchangeId === filters.exchangeId)
+    }
+  }
   if (filters.counterparty) {
     const q = filters.counterparty.toLowerCase()
     transactions = transactions.filter(
@@ -251,28 +473,32 @@ export async function listTransactions(filters: TransactionFilters = {}): Promis
 
   if (filters.limit) transactions = transactions.slice(0, filters.limit)
 
-  // Adjuntar info de bancos
+  // Adjuntar info de bancos y exchange
   return transactions.map((t) => ({
     ...t,
-    fromBank: t.fromBankId
-      ? bankMap.has(t.fromBankId)
-        ? {
-            id: bankMap.get(t.fromBankId)!.id,
-            name: bankMap.get(t.fromBankId)!.name,
-            currency: bankMap.get(t.fromBankId)!.currency,
-            color: bankMap.get(t.fromBankId)!.color,
-          }
-        : null
+    fromBank: t.fromBankId && bankMap.has(t.fromBankId)
+      ? {
+          id: bankMap.get(t.fromBankId)!.id,
+          name: bankMap.get(t.fromBankId)!.name,
+          currency: bankMap.get(t.fromBankId)!.currency,
+          color: bankMap.get(t.fromBankId)!.color,
+        }
       : null,
-    toBank: t.toBankId
-      ? bankMap.has(t.toBankId)
-        ? {
-            id: bankMap.get(t.toBankId)!.id,
-            name: bankMap.get(t.toBankId)!.name,
-            currency: bankMap.get(t.toBankId)!.currency,
-            color: bankMap.get(t.toBankId)!.color,
-          }
-        : null
+    toBank: t.toBankId && bankMap.has(t.toBankId)
+      ? {
+          id: bankMap.get(t.toBankId)!.id,
+          name: bankMap.get(t.toBankId)!.name,
+          currency: bankMap.get(t.toBankId)!.currency,
+          color: bankMap.get(t.toBankId)!.color,
+        }
+      : null,
+    exchange: t.exchangeId && exMap.has(t.exchangeId)
+      ? {
+          id: exMap.get(t.exchangeId)!.id,
+          name: exMap.get(t.exchangeId)!.name,
+          shortName: exMap.get(t.exchangeId)!.shortName,
+          color: exMap.get(t.exchangeId)!.color,
+        }
       : null,
   }))
 }
@@ -281,6 +507,26 @@ export async function createTransaction(input: TransactionInput): Promise<Transa
   const transactions = loadTransactions()
   const now = new Date().toISOString()
   const total = input.amount * input.rate
+  const exchanges = loadExchanges()
+  const exchange = input.exchangeId ? exchanges.find((e) => e.id === input.exchangeId) : null
+
+  let fee = input.fee ?? 0
+  let feeBreakdown: Transaction['feeBreakdown'] = null
+  // Si no se pasó fee explícito pero hay exchange, calcularlo
+  if (input.fee === undefined && exchange) {
+    const calc = calculateFee(exchange, input.type, total)
+    fee = calc.total
+    feeBreakdown = { baseFee: calc.baseFee, fixedFee: calc.fixedFee, total: calc.total }
+  } else if (exchange) {
+    // Si el usuario pasó fee manual y hay exchange, intentar reconstruir breakdown
+    const calc = calculateFee(exchange, input.type, total)
+    feeBreakdown = {
+      baseFee: fee - calc.fixedFee,
+      fixedFee: calc.fixedFee,
+      total: fee,
+    }
+  }
+
   const tx: Transaction = {
     id: uid(),
     type: input.type,
@@ -292,9 +538,12 @@ export async function createTransaction(input: TransactionInput): Promise<Transa
     currency: input.currency ?? 'VES',
     fromBankId: input.fromBankId ?? null,
     toBankId: input.toBankId ?? null,
+    exchangeId: input.exchangeId ?? null,
     status: input.status ?? 'completada',
     reference: input.reference ?? null,
-    fee: input.fee ?? 0,
+    fee,
+    feeBreakdown,
+    netTotal: total - fee,
     date: input.date ?? now,
     notes: input.notes ?? null,
     createdAt: now,
@@ -312,23 +561,58 @@ export async function updateTransaction(
   const transactions = loadTransactions()
   const idx = transactions.findIndex((t) => t.id === id)
   if (idx === -1) throw new Error('Transacción no encontrada')
-  const existing = transactions[idx]
+  const existing = migrateTx(transactions[idx])
   const finalAmount = input.amount ?? existing.amount
   const finalRate = input.rate ?? existing.rate
+  const total = finalAmount * finalRate
+  const exchanges = loadExchanges()
+  const exchangeId = input.exchangeId !== undefined ? input.exchangeId ?? null : existing.exchangeId
+  const exchange = exchangeId ? exchanges.find((e) => e.id === exchangeId) : null
+  const type = input.type ?? existing.type
+
+  let fee: number
+  let feeBreakdown: Transaction['feeBreakdown'] = existing.feeBreakdown ?? null
+
+  if (input.fee !== undefined) {
+    // Usuario envió fee explícito
+    fee = input.fee
+    if (exchange) {
+      const calc = calculateFee(exchange, type, total)
+      feeBreakdown = { baseFee: fee - calc.fixedFee, fixedFee: calc.fixedFee, total: fee }
+    } else {
+      feeBreakdown = { baseFee: fee, fixedFee: 0, total: fee }
+    }
+  } else if (input.exchangeId !== undefined || input.amount !== undefined || input.rate !== undefined || input.type !== undefined) {
+    // Cambió algo que afecta el cálculo — recalcular si hay exchange
+    if (exchange) {
+      const calc = calculateFee(exchange, type, total)
+      fee = calc.total
+      feeBreakdown = { baseFee: calc.baseFee, fixedFee: calc.fixedFee, total: calc.total }
+    } else {
+      fee = existing.fee
+      feeBreakdown = null
+    }
+  } else {
+    fee = existing.fee
+  }
+
   const updated: Transaction = {
     ...existing,
-    type: input.type ?? existing.type,
+    type,
     counterparty: input.counterparty ?? existing.counterparty,
     asset: input.asset ?? existing.asset,
     amount: finalAmount,
     rate: finalRate,
-    total: finalAmount * finalRate,
+    total,
     currency: input.currency ?? existing.currency,
     fromBankId: input.fromBankId !== undefined ? input.fromBankId ?? null : existing.fromBankId,
     toBankId: input.toBankId !== undefined ? input.toBankId ?? null : existing.toBankId,
+    exchangeId,
     status: input.status ?? existing.status,
     reference: input.reference !== undefined ? input.reference ?? null : existing.reference,
-    fee: input.fee ?? existing.fee,
+    fee,
+    feeBreakdown,
+    netTotal: total - fee,
     date: input.date ?? existing.date,
     notes: input.notes !== undefined ? input.notes ?? null : existing.notes,
     updatedAt: new Date().toISOString(),
@@ -348,9 +632,10 @@ export async function deleteTransaction(id: string): Promise<void> {
 // =====================
 
 export async function getStats(): Promise<Stats> {
-  const transactions = loadTransactions()
+  const transactions = loadTransactions().map(migrateTx)
   const completadas = transactions.filter((t) => t.status === 'completada')
   const banks = loadBanks()
+  const exchanges = loadExchanges()
 
   const compras = completadas.filter((t) => t.type === 'compra')
   const ventas = completadas.filter((t) => t.type === 'venta')
@@ -360,17 +645,20 @@ export async function getStats(): Promise<Stats> {
   const totalVentas = ventas.reduce((s, t) => s + t.total, 0)
   const montoCompras = compras.reduce((s, t) => s + t.amount, 0)
   const montoVentas = ventas.reduce((s, t) => s + t.amount, 0)
-  const feesCompras = compras.reduce((s, t) => s + t.fee, 0)
-  const feesVentas = ventas.reduce((s, t) => s + t.fee, 0)
+  const feesCompras = compras.reduce((s, t) => s + (t.fee || 0), 0)
+  const feesVentas = ventas.reduce((s, t) => s + (t.fee || 0), 0)
+  const feesTotal = feesCompras + feesVentas
+  const netCompras = totalCompras - feesCompras
+  const netVentas = totalVentas - feesVentas
 
   const avgRateCompra = montoCompras > 0 ? totalCompras / montoCompras : 0
   const avgRateVenta = montoVentas > 0 ? totalVentas / montoVentas : 0
   const activoNeto = montoCompras - montoVentas
   const volumenCruzado = Math.min(montoCompras, montoVentas)
-  const gananciaEstimada =
-    volumenCruzado > 0
-      ? (avgRateVenta - avgRateCompra) * volumenCruzado - (feesCompras + feesVentas)
-      : 0
+  const gananciaBruta =
+    volumenCruzado > 0 ? (avgRateVenta - avgRateCompra) * volumenCruzado : 0
+  const gananciaEstimada = gananciaBruta // bruta (sin comisiones)
+  const gananciaNeta = gananciaBruta - feesTotal // neta (después de comisiones)
 
   // Top contrapartes
   const cpMap = new Map<string, { total: number; amount: number; count: number }>()
@@ -398,6 +686,37 @@ export async function getStats(): Promise<Stats> {
   const activos = Array.from(assetMap.entries())
     .map(([asset, v]) => ({ asset, ...v }))
     .sort((a, b) => b.total - a.total)
+
+  // Comisiones por exchange
+  const exMap = new Map<string, {
+    exchangeId: string | null
+    exchangeName: string
+    exchangeColor: string
+    totalFees: number
+    count: number
+    compras: number
+    ventas: number
+  }>()
+  const exInfoMap = new Map(exchanges.map((e) => [e.id, e]))
+  for (const t of completadas) {
+    const key = t.exchangeId ?? '__none__'
+    const ex = t.exchangeId ? exInfoMap.get(t.exchangeId) : null
+    const entry = exMap.get(key) ?? {
+      exchangeId: t.exchangeId ?? null,
+      exchangeName: ex?.name ?? 'Sin exchange',
+      exchangeColor: ex?.color ?? '#64748b',
+      totalFees: 0,
+      count: 0,
+      compras: 0,
+      ventas: 0,
+    }
+    entry.totalFees += t.fee || 0
+    entry.count++
+    if (t.type === 'compra') entry.compras++
+    else entry.ventas++
+    exMap.set(key, entry)
+  }
+  const feesPorExchange = Array.from(exMap.values()).sort((a, b) => b.totalFees - a.totalFees)
 
   // Evolución mensual (12 meses)
   const now = new Date()
@@ -430,15 +749,21 @@ export async function getStats(): Promise<Stats> {
       cantidadVentas: ventas.length,
       pendientes,
       totalBanks: banks.length,
+      totalExchanges: exchanges.filter((e) => e.isActive).length,
       feesCompras,
       feesVentas,
+      feesTotal,
+      netCompras,
+      netVentas,
       avgRateCompra,
       avgRateVenta,
       activoNeto,
       gananciaEstimada,
+      gananciaNeta,
     },
     topCounterpartes,
     activos,
+    feesPorExchange,
     monthly,
   }
 }
@@ -452,6 +777,7 @@ export interface BackupData {
   exportedAt: string
   banks: Bank[]
   transactions: Transaction[]
+  exchanges: Exchange[]
 }
 
 export function exportData(): BackupData {
@@ -459,23 +785,29 @@ export function exportData(): BackupData {
     version: CURRENT_VERSION,
     exportedAt: new Date().toISOString(),
     banks: loadBanks(),
-    transactions: loadTransactions(),
+    transactions: loadTransactions().map(migrateTx),
+    exchanges: loadExchanges(),
   }
 }
 
 export function importData(data: BackupData, mode: 'replace' | 'merge' = 'replace'): void {
   if (mode === 'replace') {
-    saveBanks(data.banks)
-    saveTransactions(data.transactions)
+    if (data.banks) saveBanks(data.banks)
+    if (data.transactions) saveTransactions(data.transactions.map(migrateTx))
+    if (data.exchanges) saveExchanges(data.exchanges)
   } else {
     const existingBanks = loadBanks()
-    const existingTx = loadTransactions()
+    const existingTx = loadTransactions().map(migrateTx)
+    const existingEx = loadExchanges()
     const existingBankIds = new Set(existingBanks.map((b) => b.id))
     const existingTxIds = new Set(existingTx.map((t) => t.id))
-    const newBanks = data.banks.filter((b) => !existingBankIds.has(b.id))
-    const newTx = data.transactions.filter((t) => !existingTxIds.has(t.id))
+    const existingExIds = new Set(existingEx.map((e) => e.id))
+    const newBanks = (data.banks ?? []).filter((b) => !existingBankIds.has(b.id))
+    const newTx = (data.transactions ?? []).map(migrateTx).filter((t) => !existingTxIds.has(t.id))
+    const newEx = (data.exchanges ?? []).filter((e) => !existingExIds.has(e.id))
     saveBanks([...existingBanks, ...newBanks])
     saveTransactions([...existingTx, ...newTx])
+    saveExchanges([...existingEx, ...newEx])
   }
 }
 
@@ -483,5 +815,6 @@ export function clearAllData(): void {
   if (!isBrowser()) return
   window.localStorage.removeItem(BANKS_KEY)
   window.localStorage.removeItem(TX_KEY)
+  window.localStorage.removeItem(EXCHANGES_KEY)
   notify()
 }
