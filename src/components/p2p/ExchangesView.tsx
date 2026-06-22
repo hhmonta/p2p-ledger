@@ -84,47 +84,47 @@ export function ExchangesView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header con acciones */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-blue-500" />
+          <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2">
+            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
             Exchanges y comisiones
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Configura cada plataforma P2P con su esquema de comisiones. Se aplicarán automáticamente
             al registrar operaciones, pero siempre podrás ajustarlas manualmente.
           </p>
         </div>
-        <Button onClick={openNew}>
+        <Button onClick={openNew} size="sm" className="self-start">
           <Plus className="mr-1 h-4 w-4" /> Nuevo exchange
         </Button>
       </div>
 
       {/* Grid de exchanges */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[...Array(3)].map((_, i) => (
-            <Card key={i} className="h-48 animate-pulse bg-muted/40" />
+            <Card key={i} className="h-40 animate-pulse bg-muted/40" />
           ))}
         </div>
       ) : exchanges.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Building2 className="h-12 w-12 text-muted-foreground/50 mb-3" />
-            <p className="font-medium">No hay exchanges registrados</p>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+            <Building2 className="h-10 w-10 text-muted-foreground/50 mb-2" />
+            <p className="font-medium text-sm">No hay exchanges registrados</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm">
               Crea tu primer exchange para empezar a registrar comisiones automáticamente en tus
               operaciones.
             </p>
-            <Button onClick={openNew} className="mt-4">
+            <Button onClick={openNew} size="sm" className="mt-3">
               <Plus className="mr-1 h-4 w-4" /> Crear exchange
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {exchanges.map((e) => {
             const txCount = e._count?.transactions ?? 0
             return (

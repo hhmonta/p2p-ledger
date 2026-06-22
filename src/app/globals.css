@@ -118,5 +118,30 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevenir zoom en inputs de iOS/Android y mejorar responsividad en APK */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Suavizar fonts en mobile */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevenir overscroll en APK */
+    overscroll-behavior-y: contain;
+  }
+  /* El container de Tailwind por defecto es max-w-7xl; en móvil usamos todo el ancho */
+  .container {
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  @media (min-width: 1024px) {
+    .container {
+      max-width: 1024px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .container {
+      max-width: 1280px;
+    }
   }
 }

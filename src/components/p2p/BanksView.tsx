@@ -108,42 +108,42 @@ export function BanksView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total bancos</CardDescription>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Landmark className="h-5 w-5 text-emerald-500" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="text-[10px] sm:text-xs">Total bancos</CardDescription>
+            <CardTitle className="flex items-center gap-1.5 sm:gap-2 text-base sm:text-2xl">
+              <Landmark className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
               {banks.length}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Balance total</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="text-[10px] sm:text-xs">Balance total</CardDescription>
+            <CardTitle className="text-base sm:text-2xl tabular-nums leading-tight">
               {formatCurrency(totalBalance)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-emerald-500" /> Entradas totales
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" /> Entradas
             </CardDescription>
-            <CardTitle className="text-2xl tabular-nums text-emerald-600 dark:text-emerald-400">
+            <CardTitle className="text-base sm:text-2xl tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
               {formatCurrency(totalEntradas)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <TrendingDown className="h-3 w-3 text-rose-500" /> Salidas totales
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" /> Salidas
             </CardDescription>
-            <CardTitle className="text-2xl tabular-nums text-rose-600 dark:text-rose-400">
+            <CardTitle className="text-base sm:text-2xl tabular-nums text-rose-600 dark:text-rose-400 leading-tight">
               {formatCurrency(totalSalidas)}
             </CardTitle>
           </CardHeader>
@@ -151,10 +151,10 @@ export function BanksView() {
       </div>
 
       {/* Header con acciones */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Cuentas bancarias</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-base sm:text-xl font-semibold">Cuentas bancarias</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Registra los bancos que usas para enviar y recibir dinero en tus operaciones P2P.
           </p>
         </div>

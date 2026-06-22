@@ -48,15 +48,15 @@ export function Dashboard() {
 
   if (isLoading || !stats) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-3 sm:space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="h-28 animate-pulse bg-muted/40" />
+            <Card key={i} className="h-20 sm:h-24 animate-pulse bg-muted/40" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {[...Array(2)].map((_, i) => (
-            <Card key={i} className="h-80 animate-pulse bg-muted/40" />
+            <Card key={i} className="h-64 animate-pulse bg-muted/40" />
           ))}
         </div>
       </div>
@@ -84,119 +84,118 @@ export function Dashboard() {
   const totalNeto = r.netCompras + r.netVentas
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-semibold">Resumen general</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-lg sm:text-xl font-semibold">Resumen general</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Visión global de tu actividad P2P: volumen, comisiones, tasas y ganancia neta.
         </p>
       </div>
 
       {/* KPIs principales */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-emerald-500" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
               Total comprado
             </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl tabular-nums">
+            <CardTitle className="text-base sm:text-xl tabular-nums leading-tight">
               {formatCurrency(r.totalCompras)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} unidades
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} u.
             </p>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <TrendingDown className="h-3 w-3 text-rose-500" />
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
               Total vendido
             </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl tabular-nums">
+            <CardTitle className="text-base sm:text-xl tabular-nums leading-tight">
               {formatCurrency(r.totalVentas)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} unidades
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} u.
             </p>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <PiggyBank className="h-3 w-3" />
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               Ganancia neta
             </CardDescription>
-            <CardTitle className={`text-xl sm:text-2xl tabular-nums ${gananciaColor}`}>
+            <CardTitle className={`text-base sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
               {formatCurrency(r.gananciaNeta)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Spread × volumen − comisiones
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Spread × vol − fees
             </p>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Clock className="h-3 w-3 text-amber-500" />
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
               Pendientes
             </CardDescription>
-            <CardTitle className="text-xl sm:text-2xl tabular-nums">
+            <CardTitle className="text-base sm:text-xl tabular-nums leading-tight">
               {r.pendientes}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Operaciones por confirmar
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Por confirmar
             </p>
           </CardHeader>
         </Card>
       </div>
 
       {/* KPIs secundarios */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Coins className="h-3 w-3" />
-              Tasa prom. compra
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <Coins className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              Tasa compra
             </CardDescription>
-            <CardTitle className="text-lg tabular-nums">
+            <CardTitle className="text-sm sm:text-lg tabular-nums leading-tight">
               {formatNumber(r.avgRateCompra, 2)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Coins className="h-3 w-3" />
-              Tasa prom. venta
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <Coins className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              Tasa venta
             </CardDescription>
-            <CardTitle className="text-lg tabular-nums">
+            <CardTitle className="text-sm sm:text-lg tabular-nums leading-tight">
               {formatNumber(r.avgRateVenta, 2)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Wallet className="h-3 w-3" />
-              Stock neto activo
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <Wallet className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              Stock activo
             </CardDescription>
-            <CardTitle className="text-lg tabular-nums">
+            <CardTitle className="text-sm sm:text-lg tabular-nums leading-tight">
               {formatNumber(r.activoNeto, 2)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Comprado − vendido</p>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Activity className="h-3 w-3" />
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               Spread
             </CardDescription>
             <CardTitle
-              className={`text-lg tabular-nums ${
+              className={`text-sm sm:text-lg tabular-nums leading-tight ${
                 r.avgRateVenta - r.avgRateCompra >= 0
                   ? 'text-emerald-600 dark:text-emerald-400'
                   : 'text-rose-600 dark:text-rose-400'
@@ -204,37 +203,36 @@ export function Dashboard() {
             >
               {formatNumber(r.avgRateVenta - r.avgRateCompra, 2)}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Venta − compra</p>
           </CardHeader>
         </Card>
       </div>
 
       {/* Comisiones: bloque destacado */}
       <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                <Percent className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Percent className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total comisiones</p>
-                <p className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Total comisiones</p>
+                <p className="text-lg sm:text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
                   {formatCurrency(totalFees)}
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 flex-1 text-sm">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 flex-1 text-xs sm:text-sm">
               <div>
-                <p className="text-xs text-muted-foreground">En compras</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Compras</p>
                 <p className="font-medium tabular-nums">{formatCurrency(r.feesCompras)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">En ventas</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Ventas</p>
                 <p className="font-medium tabular-nums">{formatCurrency(r.feesVentas)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Volumen neto</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Neto</p>
                 <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(totalNeto)}
                 </p>
@@ -245,19 +243,19 @@ export function Dashboard() {
       </Card>
 
       {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Evolución mensual */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-sm sm:text-base">
               Evolución mensual — Compras vs Ventas
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Últimos 12 meses en moneda fiat (VES por defecto)
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-72">
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="h-48 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthly} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
@@ -283,34 +281,34 @@ export function Dashboard() {
 
         {/* Comisiones por exchange */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
               <Building2 className="h-4 w-4 text-amber-500" />
               Comisiones por exchange
             </CardTitle>
-            <CardDescription>Desglose de comisiones pagadas por plataforma</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Desglose de comisiones pagadas por plataforma</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6 pt-0">
             {stats.feesPorExchange.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
+              <p className="text-xs sm:text-sm text-muted-foreground py-6 text-center">
                 Aún no hay comisiones registradas
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {stats.feesPorExchange.map((f) => {
                   const max = stats.feesPorExchange[0]?.totalFees || 1
                   const pct = max > 0 ? (f.totalFees / max) * 100 : 0
                   return (
                     <div key={f.exchangeId ?? 'none'} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2 truncate">
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
                           <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: f.exchangeColor }}
                           />
                           <span className="font-medium truncate">{f.exchangeName}</span>
                         </span>
-                        <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400">
+                        <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400 flex-shrink-0 ml-2">
                           {formatCurrency(f.totalFees)}
                         </span>
                       </div>
@@ -323,8 +321,8 @@ export function Dashboard() {
                           }}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {f.count} ops · {f.compras} compras · {f.ventas} ventas
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                        {f.count} ops · {f.compras} comp · {f.ventas} vent
                       </p>
                     </div>
                   )
@@ -336,39 +334,39 @@ export function Dashboard() {
 
         {/* Top contrapartes */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
               Top contrapartes
             </CardTitle>
-            <CardDescription>Por volumen fiat operado</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Por volumen fiat operado</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6 pt-0">
             {stats.topCounterpartes.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
+              <p className="text-xs sm:text-sm text-muted-foreground py-6 text-center">
                 Aún no hay datos
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {stats.topCounterpartes.map((c, i) => {
                   const max = stats.topCounterpartes[0].total || 1
                   const pct = (c.total / max) * 100
                   return (
                     <div key={c.counterparty} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="flex items-center gap-2 truncate">
-                          <span className="text-xs text-muted-foreground w-4">
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
+                          <span className="text-[10px] sm:text-xs text-muted-foreground w-4 flex-shrink-0">
                             #{i + 1}
                           </span>
                           <span className="font-medium truncate">
                             {c.counterparty}
                           </span>
                         </span>
-                        <span className="tabular-nums font-medium">
+                        <span className="tabular-nums font-medium flex-shrink-0 ml-2">
                           {formatCurrency(c.total)}
                         </span>
                       </div>
-                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div className="h-1.5 sm:h-2 rounded-full bg-muted overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all"
                           style={{
@@ -377,8 +375,8 @@ export function Dashboard() {
                           }}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {c.count} ops · {formatNumber(c.amount)} unidades
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                        {c.count} ops · {formatNumber(c.amount)} u.
                       </p>
                     </div>
                   )
@@ -390,23 +388,23 @@ export function Dashboard() {
 
         {/* Activos negociados */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+          <CardHeader className="p-3 sm:p-6">
+            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
               <Coins className="h-4 w-4" />
               Activos negociados
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Distribución por volumen fiat
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-6 pt-0">
             {stats.activos.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
+              <p className="text-xs sm:text-sm text-muted-foreground py-6 text-center">
                 Aún no hay datos
               </p>
             ) : (
-              <div className="flex items-center gap-4">
-                <div className="h-48 w-48 flex-shrink-0">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="h-32 w-32 sm:h-48 sm:w-48 flex-shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -415,8 +413,8 @@ export function Dashboard() {
                         nameKey="asset"
                         cx="50%"
                         cy="50%"
-                        outerRadius={70}
-                        innerRadius={40}
+                        outerRadius={56}
+                        innerRadius={32}
                         paddingAngle={2}
                       >
                         {stats.activos.map((_, i) => (
@@ -437,26 +435,26 @@ export function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 space-y-1.5 sm:space-y-2 min-w-0">
                   {stats.activos.map((a, i) => (
                     <div
                       key={a.asset}
-                      className="flex items-center justify-between text-sm"
+                      className="flex items-center justify-between text-xs sm:text-sm"
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                         <span
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
                           style={{
                             backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
                           }}
                         />
                         <span className="font-medium">{a.asset}</span>
                       </span>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0 ml-2">
                         <div className="tabular-nums font-medium">
                           {formatCurrency(a.total)}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-[10px] sm:text-xs text-muted-foreground">
                           {formatNumber(a.amount)} · {a.count} ops
                         </div>
                       </div>
@@ -471,9 +469,9 @@ export function Dashboard() {
 
       {/* Footer informativo */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3 text-sm">
-            <Users className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+        <CardContent className="p-3 sm:p-6">
+          <div className="flex items-start gap-2.5 sm:gap-3 text-xs sm:text-sm">
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-medium">Cómo se calcula la ganancia neta</p>
               <p className="text-muted-foreground">

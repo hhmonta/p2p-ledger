@@ -187,39 +187,39 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
     mode === 'venta' ? 'venta' : 'compra'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Operaciones</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="text-[10px] sm:text-xs">Operaciones</CardDescription>
+            <CardTitle className="text-base sm:text-2xl tabular-nums leading-tight">
               {filtered.length}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Volumen bruto</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="text-[10px] sm:text-xs">Volumen bruto</CardDescription>
+            <CardTitle className="text-base sm:text-2xl tabular-nums leading-tight">
               {formatCurrency(totalFiat)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Building2 className="h-3 w-3 text-amber-500" /> Comisiones
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+              <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" /> Comisiones
             </CardDescription>
-            <CardTitle className="text-2xl tabular-nums text-amber-600 dark:text-amber-400">
+            <CardTitle className="text-base sm:text-2xl tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
               {formatCurrency(totalFees)}
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Volumen neto</CardDescription>
-            <CardTitle className="text-2xl tabular-nums text-emerald-600 dark:text-emerald-400">
+        <Card className="p-0">
+          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
+            <CardDescription className="text-[10px] sm:text-xs">Volumen neto</CardDescription>
+            <CardTitle className="text-base sm:text-2xl tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
               {formatCurrency(totalNeto)}
             </CardTitle>
           </CardHeader>
@@ -227,16 +227,16 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
       </div>
 
       {/* Header con acciones */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            {mode === 'compra' && <ShoppingCart className="h-5 w-5 text-emerald-500" />}
-            {mode === 'venta' && <Tag className="h-5 w-5 text-rose-500" />}
+          <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2">
+            {mode === 'compra' && <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />}
+            {mode === 'venta' && <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500" />}
             {title}
           </h2>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">{description}</p>
         </div>
-        <Button onClick={openNew}>
+        <Button onClick={openNew} size="sm" className="self-start">
           <Plus className="mr-1 h-4 w-4" />
           {mode === 'venta' ? 'Nueva venta' : 'Nueva compra'}
         </Button>
