@@ -21,7 +21,7 @@ const TX_KEY = 'p2p:transactions'
 const EXCHANGES_KEY = 'p2p:exchanges'
 const VERSION_KEY = 'p2p:version'
 
-const CURRENT_VERSION = '3'
+const CURRENT_VERSION = '4'
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -71,10 +71,23 @@ function ensureInit() {
   const version = window.localStorage.getItem(VERSION_KEY)
   if (version !== CURRENT_VERSION) {
     // Si vienen de una versión anterior, migrar exchanges existentes
-    if (version === '2') {
+    if (version === '2' || version === '3') {
       const existing = readJSON<Exchange[]>(EXCHANGES_KEY, [])
       const migrated = existing.map(migrateExchange)
-      writeJSON(EXCHANGES_KEY, migrated)
+      // En la migración v3 → v4 añadimos Bybit, KuCoin y Paxful si no existen
+      if (version === '3') {
+        const existingNames = new Set(migrated.map((e) => e.name.toLowerCase()))
+        const additions = defaultExchanges().filter(
+          (e) => !existingNames.has(e.name.toLowerCase())
+        )
+        // Solo añadimos los nuevos (Bybit, KuCoin, Paxful) - no duplicamos los antiguos
+        const newOnes = additions.filter((e) =>
+          ['Bybit P2P', 'KuCoin P2P', 'Paxful', 'Bybit Spot', 'KuCoin Spot'].includes(e.name)
+        )
+        writeJSON(EXCHANGES_KEY, [...migrated, ...newOnes])
+      } else {
+        writeJSON(EXCHANGES_KEY, migrated)
+      }
     }
     // Si es primera instalación (sin versión), sembrar exchanges por defecto
     if (!version) {
@@ -220,6 +233,131 @@ function defaultExchanges(): Exchange[] {
       discountLabel: 'Descuento BNB (25%)',
       isActive: true,
       notes: 'Comisiones de spot trading (VIP/tier según volumen 30d). Con BNB descuento del 25% sobre la comisión.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'Bybit P2P',
+      shortName: 'BYB',
+      color: '#f7a600',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      buyTiers: [],
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0,
+      sellTiers: [],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
+      isActive: true,
+      notes: 'Bybit P2P no cobra comisión de taker al usuario en operaciones P2P. Aplican comisiones de retiro del activo según la red.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'Bybit Spot',
+      shortName: 'BYB-S',
+      color: '#ff9f1a',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0.1,
+      buyTiers: [
+        // Tiers VIP de Bybit: 0.1% base, baja con volumen 30d
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 0.1 },
+        { minAmount: 50000, feeType: 'percent' as FeeType, feeValue: 0.08 },
+        { minAmount: 250000, feeType: 'percent' as FeeType, feeValue: 0.06 },
+      ],
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0.1,
+      sellTiers: [
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 0.1 },
+        { minAmount: 50000, feeType: 'percent' as FeeType, feeValue: 0.08 },
+        { minAmount: 250000, feeType: 'percent' as FeeType, feeValue: 0.06 },
+      ],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
+      isActive: true,
+      notes: 'Bybit Spot: comisión maker/taker base 0.1%. Baja según VIP level (volumen 30d). Sin descuento BNB como en Binance.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'KuCoin P2P',
+      shortName: 'KC',
+      color: '#24d39a',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      buyTiers: [],
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0,
+      sellTiers: [],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
+      isActive: true,
+      notes: 'KuCoin P2P no cobra comisión al usuario final en operaciones P2P. Aplican comisiones de retiro del activo.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'KuCoin Spot',
+      shortName: 'KC-S',
+      color: '#1ed692',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0.1,
+      buyTiers: [
+        // KuCoin VIP tiers: 0.1% base, baja a 0.06% en VIP1+
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 0.1 },
+        { minAmount: 50000, feeType: 'percent' as FeeType, feeValue: 0.08 },
+        { minAmount: 250000, feeType: 'percent' as FeeType, feeValue: 0.06 },
+      ],
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0.1,
+      sellTiers: [
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 0.1 },
+        { minAmount: 50000, feeType: 'percent' as FeeType, feeValue: 0.08 },
+        { minAmount: 250000, feeType: 'percent' as FeeType, feeValue: 0.06 },
+      ],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      // KuCoin ofrece descuento del 20% si pagas comisión con KCS
+      discountPercent: 20,
+      discountLabel: 'Descuento KCS (20%)',
+      isActive: true,
+      notes: 'KuCoin Spot: comisión base 0.1% maker/taker. Con KCS descuento del 20% sobre la comisión. VIP levels por volumen 30d.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'Paxful',
+      shortName: 'PAX',
+      color: '#8dc351',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      buyTiers: [],
+      // Paxful cobra comisión al vendedor, no al comprador. Varía según método de pago
+      // (gift cards: 1-5%, transferencia bancaria: 0.5-1%, etc.)
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 1,
+      sellTiers: [
+        // Tiers típicos según método de pago (aproximado)
+        { minAmount: 0, feeType: 'percent' as FeeType, feeValue: 1 },
+        { minAmount: 1000, feeType: 'percent' as FeeType, feeValue: 0.5 },
+      ],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USD',
+      discountPercent: 0,
+      discountLabel: null,
+      isActive: true,
+      notes: 'Paxful cobra comisión al vendedor (varía por método de pago: gift cards 1-5%, banca 0.5-1%). Comprador no paga comisión a Paxful.',
       createdAt: now,
       updatedAt: now,
     },
