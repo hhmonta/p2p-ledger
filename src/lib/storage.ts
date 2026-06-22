@@ -1,6 +1,9 @@
 // Capa de almacenamiento local (localStorage) para P2P Ledger.
 // Funciona en navegador y dentro de un APK (Capacitor WebView).
 // Sustituye a las API routes + Prisma para permitir ejecución 100% offline.
+//
+// Soporta cifrado transparente AES-GCM cuando hay una DEK activa
+// (provista por auth-context cuando el usuario desbloquea la app).
 
 import type {
   Bank,
@@ -15,6 +18,7 @@ import type {
   FeeType,
   Stats,
 } from './types'
+import { encryptJson, decryptJson } from './security'
 
 const BANKS_KEY = 'p2p:banks'
 const TX_KEY = 'p2p:transactions'
@@ -23,11 +27,30 @@ const VERSION_KEY = 'p2p:version'
 
 const CURRENT_VERSION = '4'
 
+// Claves cuyos valores se cifran cuando hay DEK activa
+const ENCRYPTED_KEYS = new Set<string>([BANKS_KEY, TX_KEY, EXCHANGES_KEY])
+
+// Prefijo para detectar entradas cifradas
+const ENC_PREFIX = 'enc:v1:'
+
+// DEK en memoria (inyectada por auth-context cuando el usuario desbloquea)
+let activeDek: CryptoKey | null = null
+
+/** Inyecta la DEK para que storage cifre/descifre automáticamente. */
+export function setActiveDek(dek: CryptoKey | null) {
+  activeDek = dek
+}
+
+/** Indica si la capa de cifrado está activa (hay DEK cargada). */
+export function isEncryptionActive(): boolean {
+  return activeDek !== null
+}
+
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 }
 
-function readJSON<T>(key: string, fallback: T): T {
+function readJSONSync<T>(key: string, fallback: T): T {
   if (!isBrowser()) return fallback
   try {
     const raw = window.localStorage.getItem(key)
@@ -38,9 +61,80 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
+async function readJSON<T>(key: string, fallback: T): Promise<T> {
+  if (!isBrowser()) return fallback
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return fallback
+    // Si la entrada está cifrada y tenemos DEK, descifrar
+    if (raw.startsWith(ENC_PREFIX)) {
+      if (!activeDek) {
+        // App bloqueada o sin DEK: no podemos descifrar
+        return fallback
+      }
+      const payload = raw.slice(ENC_PREFIX.length)
+      return decryptJson<T>(payload, activeDek)
+    }
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
 function writeJSON(key: string, value: unknown): void {
   if (!isBrowser()) return
+  if (ENCRYPTED_KEYS.has(key) && activeDek) {
+    // Cifrar antes de guardar
+    encryptJson(value, activeDek)
+      .then((payload) => {
+        window.localStorage.setItem(key, ENC_PREFIX + payload)
+      })
+      .catch(() => {
+        // Si falla el cifrado, no escribir (mejor perder el dato que guardarlo en claro)
+      })
+    return
+  }
   window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+/**
+ * Migra entradas en claro a cifradas cuando se activa el PIN.
+ * Lee todas las claves sensibles y las re-escribe cifradas.
+ */
+export async function encryptAllStorage(dek: CryptoKey) {
+  if (!isBrowser()) return
+  for (const key of ENCRYPTED_KEYS) {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) continue
+    if (raw.startsWith(ENC_PREFIX)) continue // ya cifrada
+    try {
+      const parsed = JSON.parse(raw)
+      const payload = await encryptJson(parsed, dek)
+      window.localStorage.setItem(key, ENC_PREFIX + payload)
+    } catch {
+      // ignorar entradas inválidas
+    }
+  }
+}
+
+/**
+ * Migra entradas cifradas a claro cuando se desactiva el PIN.
+ * Requiere DEK para descifrar antes de quitarla.
+ */
+export async function decryptAllStorage(dek: CryptoKey) {
+  if (!isBrowser()) return
+  for (const key of ENCRYPTED_KEYS) {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) continue
+    if (!raw.startsWith(ENC_PREFIX)) continue // ya en claro
+    try {
+      const payload = raw.slice(ENC_PREFIX.length)
+      const parsed = await decryptJson<unknown>(payload, dek)
+      window.localStorage.setItem(key, JSON.stringify(parsed))
+    } catch {
+      // ignorar
+    }
+  }
 }
 
 function uid(): string {
@@ -72,7 +166,7 @@ function ensureInit() {
   if (version !== CURRENT_VERSION) {
     // Si vienen de una versión anterior, migrar exchanges existentes
     if (version === '2' || version === '3') {
-      const existing = readJSON<Exchange[]>(EXCHANGES_KEY, [])
+      const existing = readJSONSync<Exchange[]>(EXCHANGES_KEY, [])
       const migrated = existing.map(migrateExchange)
       // En la migración v3 → v4 añadimos Bybit, KuCoin y Paxful si no existen
       if (version === '3') {
@@ -368,7 +462,7 @@ function defaultExchanges(): Exchange[] {
 // Bancos
 // =====================
 
-function loadBanks(): Bank[] {
+async function loadBanks(): Promise<Bank[]> {
   ensureInit()
   return readJSON<Bank[]>(BANKS_KEY, [])
 }
@@ -413,8 +507,8 @@ function computeBankBalance(bank: Bank, transactions: Transaction[]): {
 }
 
 export async function listBanks(): Promise<Bank[]> {
-  const banks = loadBanks()
-  const transactions = loadTransactions()
+  const banks = await loadBanks()
+  const transactions = await loadTransactions()
   return banks
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .map((b) => {
@@ -433,7 +527,7 @@ export async function listBanks(): Promise<Bank[]> {
 }
 
 export async function createBank(input: BankInput): Promise<Bank> {
-  const banks = loadBanks()
+  const banks = await loadBanks()
   const now = new Date().toISOString()
   const bank: Bank = {
     id: uid(),
@@ -455,7 +549,7 @@ export async function createBank(input: BankInput): Promise<Bank> {
 }
 
 export async function updateBank(id: string, input: Partial<BankInput>): Promise<Bank> {
-  const banks = loadBanks()
+  const banks = await loadBanks()
   const idx = banks.findIndex((b) => b.id === id)
   if (idx === -1) throw new Error('Banco no encontrado')
   const updated: Bank = {
@@ -472,10 +566,10 @@ export async function updateBank(id: string, input: Partial<BankInput>): Promise
 }
 
 export async function deleteBank(id: string): Promise<void> {
-  const banks = loadBanks()
+  const banks = await loadBanks()
   saveBanks(banks.filter((b) => b.id !== id))
   // Desvincular transacciones
-  const transactions = loadTransactions()
+  const transactions = await loadTransactions()
   let changed = false
   for (const t of transactions) {
     if (t.fromBankId === id || t.toBankId === id) {
@@ -491,9 +585,10 @@ export async function deleteBank(id: string): Promise<void> {
 // Exchanges
 // =====================
 
-function loadExchanges(): Exchange[] {
+async function loadExchanges(): Promise<Exchange[]> {
   ensureInit()
-  return readJSON<Exchange[]>(EXCHANGES_KEY, []).map(migrateExchange)
+  const list = await readJSON<Exchange[]>(EXCHANGES_KEY, [])
+  return list.map(migrateExchange)
 }
 
 function saveExchanges(exchanges: Exchange[]): void {
@@ -502,8 +597,8 @@ function saveExchanges(exchanges: Exchange[]): void {
 }
 
 export async function listExchanges(): Promise<Exchange[]> {
-  const exchanges = loadExchanges()
-  const transactions = loadTransactions()
+  const exchanges = await loadExchanges()
+  const transactions = await loadTransactions()
   return exchanges
     .sort((a, b) => {
       // Activos primero, luego por nombre
@@ -519,7 +614,7 @@ export async function listExchanges(): Promise<Exchange[]> {
 }
 
 export async function createExchange(input: ExchangeInput): Promise<Exchange> {
-  const exchanges = loadExchanges()
+  const exchanges = await loadExchanges()
   const now = new Date().toISOString()
   const exchange: Exchange = {
     id: uid(),
@@ -547,7 +642,7 @@ export async function createExchange(input: ExchangeInput): Promise<Exchange> {
 }
 
 export async function updateExchange(id: string, input: Partial<ExchangeInput>): Promise<Exchange> {
-  const exchanges = loadExchanges()
+  const exchanges = await loadExchanges()
   const idx = exchanges.findIndex((e) => e.id === id)
   if (idx === -1) throw new Error('Exchange no encontrado')
   const updated: Exchange = {
@@ -566,10 +661,10 @@ export async function updateExchange(id: string, input: Partial<ExchangeInput>):
 }
 
 export async function deleteExchange(id: string): Promise<void> {
-  const exchanges = loadExchanges()
+  const exchanges = await loadExchanges()
   saveExchanges(exchanges.filter((e) => e.id !== id))
   // Desvincular transacciones (conservando fee aplicado)
-  const transactions = loadTransactions()
+  const transactions = await loadTransactions()
   let changed = false
   for (const t of transactions) {
     if (t.exchangeId === id) {
@@ -647,7 +742,7 @@ export function calculateFee(
 // Transacciones
 // =====================
 
-function loadTransactions(): Transaction[] {
+async function loadTransactions(): Promise<Transaction[]> {
   ensureInit()
   return readJSON<Transaction[]>(TX_KEY, [])
 }
@@ -680,11 +775,11 @@ export interface TransactionFilters {
 }
 
 export async function listTransactions(filters: TransactionFilters = {}): Promise<Transaction[]> {
-  const banks = loadBanks()
+  const banks = await loadBanks()
   const bankMap = new Map(banks.map((b) => [b.id, b]))
-  const exchanges = loadExchanges()
+  const exchanges = await loadExchanges()
   const exMap = new Map(exchanges.map((e) => [e.id, e]))
-  let transactions = loadTransactions().map(migrateTx)
+  let transactions = (await loadTransactions()).map(migrateTx)
 
   if (filters.type) transactions = transactions.filter((t) => t.type === filters.type)
   if (filters.status) transactions = transactions.filter((t) => t.status === filters.status)
@@ -755,10 +850,10 @@ export async function listTransactions(filters: TransactionFilters = {}): Promis
 }
 
 export async function createTransaction(input: TransactionInput): Promise<Transaction> {
-  const transactions = loadTransactions()
+  const transactions = await loadTransactions()
   const now = new Date().toISOString()
   const total = input.amount * input.rate
-  const exchanges = loadExchanges()
+  const exchanges = await loadExchanges()
   const exchange = input.exchangeId ? exchanges.find((e) => e.id === input.exchangeId) : null
 
   let fee = input.fee ?? 0
@@ -816,14 +911,14 @@ export async function updateTransaction(
   id: string,
   input: Partial<TransactionInput>
 ): Promise<Transaction> {
-  const transactions = loadTransactions()
+  const transactions = await loadTransactions()
   const idx = transactions.findIndex((t) => t.id === id)
   if (idx === -1) throw new Error('Transacción no encontrada')
   const existing = migrateTx(transactions[idx])
   const finalAmount = input.amount ?? existing.amount
   const finalRate = input.rate ?? existing.rate
   const total = finalAmount * finalRate
-  const exchanges = loadExchanges()
+  const exchanges = await loadExchanges()
   const exchangeId = input.exchangeId !== undefined ? input.exchangeId ?? null : existing.exchangeId
   const exchange = exchangeId ? exchanges.find((e) => e.id === exchangeId) : null
   const type = input.type ?? existing.type
@@ -892,7 +987,7 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  const transactions = loadTransactions()
+  const transactions = await loadTransactions()
   saveTransactions(transactions.filter((t) => t.id !== id))
 }
 
@@ -901,10 +996,10 @@ export async function deleteTransaction(id: string): Promise<void> {
 // =====================
 
 export async function getStats(): Promise<Stats> {
-  const transactions = loadTransactions().map(migrateTx)
+  const transactions = (await loadTransactions()).map(migrateTx)
   const completadas = transactions.filter((t) => t.status === 'completada')
-  const banks = loadBanks()
-  const exchanges = loadExchanges()
+  const banks = await loadBanks()
+  const exchanges = await loadExchanges()
 
   const compras = completadas.filter((t) => t.type === 'compra')
   const ventas = completadas.filter((t) => t.type === 'venta')
@@ -1049,25 +1144,25 @@ export interface BackupData {
   exchanges: Exchange[]
 }
 
-export function exportData(): BackupData {
+export async function exportData(): Promise<BackupData> {
   return {
     version: CURRENT_VERSION,
     exportedAt: new Date().toISOString(),
-    banks: loadBanks(),
-    transactions: loadTransactions().map(migrateTx),
-    exchanges: loadExchanges(),
+    banks: await loadBanks(),
+    transactions: (await loadTransactions()).map(migrateTx),
+    exchanges: await loadExchanges(),
   }
 }
 
-export function importData(data: BackupData, mode: 'replace' | 'merge' = 'replace'): void {
+export async function importData(data: BackupData, mode: 'replace' | 'merge' = 'replace'): Promise<void> {
   if (mode === 'replace') {
     if (data.banks) saveBanks(data.banks)
     if (data.transactions) saveTransactions(data.transactions.map(migrateTx))
     if (data.exchanges) saveExchanges(data.exchanges)
   } else {
-    const existingBanks = loadBanks()
-    const existingTx = loadTransactions().map(migrateTx)
-    const existingEx = loadExchanges()
+    const existingBanks = await loadBanks()
+    const existingTx = (await loadTransactions()).map(migrateTx)
+    const existingEx = await loadExchanges()
     const existingBankIds = new Set(existingBanks.map((b) => b.id))
     const existingTxIds = new Set(existingTx.map((t) => t.id))
     const existingExIds = new Set(existingEx.map((e) => e.id))
