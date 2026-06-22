@@ -84,7 +84,7 @@ export function ExchangesView() {
   }
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-2.5 sm:space-y-4">
       {/* Header con acciones */}
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
         <div>
@@ -92,7 +92,7 @@ export function ExchangesView() {
             <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
             Exchanges y comisiones
           </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">
+          <p className="text-[11px] sm:text-sm text-muted-foreground">
             Configura cada plataforma P2P con su esquema de comisiones. Se aplicarán automáticamente
             al registrar operaciones, pero siempre podrás ajustarlas manualmente.
           </p>
@@ -104,9 +104,9 @@ export function ExchangesView() {
 
       {/* Grid de exchanges */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
           {[...Array(3)].map((_, i) => (
-            <Card key={i} className="h-40 animate-pulse bg-muted/40" />
+            <Card key={i} className="h-32 sm:h-40 animate-pulse bg-muted/40" />
           ))}
         </div>
       ) : exchanges.length === 0 ? (
@@ -124,23 +124,23 @@ export function ExchangesView() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
           {exchanges.map((e) => {
             const txCount = e._count?.transactions ?? 0
             return (
               <Card key={e.id} className="overflow-hidden transition hover:shadow-md">
-                <div className="h-1.5" style={{ backgroundColor: e.color }} />
-                <CardHeader className="pb-3">
+                <div className="h-1" style={{ backgroundColor: e.color }} />
+                <CardHeader className="p-2.5 sm:p-6 pb-2 sm:pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <CardTitle className="flex items-center gap-2 text-base">
+                      <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                         <span
-                          className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          className="inline-block w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
                           style={{ backgroundColor: e.color }}
                         />
                         <span className="truncate">{e.name}</span>
                       </CardTitle>
-                      <CardDescription className="mt-1">
+                      <CardDescription className="mt-0.5 text-[10px] sm:text-sm">
                         {e.shortName && <span className="font-mono">{e.shortName} · </span>}
                         {txCount} {txCount === 1 ? 'operación' : 'operaciones'}
                         {!e.isActive && (
@@ -148,42 +148,42 @@ export function ExchangesView() {
                         )}
                       </CardDescription>
                     </div>
-                    <div className="flex gap-1 flex-shrink-0">
+                    <div className="flex gap-0.5 flex-shrink-0">
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8"
+                        className="h-7 w-7 sm:h-8 sm:w-8"
                         onClick={() => openEdit(e)}
                         title="Editar"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 hover:text-rose-600"
+                        className="h-7 w-7 sm:h-8 sm:w-8 hover:text-rose-600"
                         onClick={() => setDeleting(e)}
                         title="Eliminar"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="p-2.5 sm:p-6 pt-0 space-y-1.5 sm:space-y-2">
                   {/* Comisiones */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
+                  <div className="space-y-1 sm:space-y-2">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                         <Percent className="h-3 w-3" /> Compra
                       </span>
                       <span className="tabular-nums font-medium text-right">
                         {e.buyTiers && e.buyTiers.length > 0 ? (
                           <span className="flex flex-col items-end">
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-[10px] text-muted-foreground">
                               {e.buyTiers.length} {e.buyTiers.length === 1 ? 'tier' : 'tiers'}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[9px] text-muted-foreground">
                               {formatNumber(e.buyTiers[0].feeValue, 4)}
                               {e.buyTiers[0].feeType === 'percent' ? '%' : ' fijo'} →{' '}
                               {formatNumber(e.buyTiers[e.buyTiers.length - 1].feeValue, 4)}
@@ -199,17 +199,17 @@ export function ExchangesView() {
                         )}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
                       <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
                         <Percent className="h-3 w-3" /> Venta
                       </span>
                       <span className="tabular-nums font-medium text-right">
                         {e.sellTiers && e.sellTiers.length > 0 ? (
                           <span className="flex flex-col items-end">
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-[10px] text-muted-foreground">
                               {e.sellTiers.length} {e.sellTiers.length === 1 ? 'tier' : 'tiers'}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[9px] text-muted-foreground">
                               {formatNumber(e.sellTiers[0].feeValue, 4)}
                               {e.sellTiers[0].feeType === 'percent' ? '%' : ' fijo'} →{' '}
                               {formatNumber(e.sellTiers[e.sellTiers.length - 1].feeValue, 4)}
@@ -226,7 +226,7 @@ export function ExchangesView() {
                       </span>
                     </div>
                     {e.fixedFee > 0 && (
-                      <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
                         <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                           <Coins className="h-3 w-3" /> Fija adicional
                         </span>
@@ -236,7 +236,7 @@ export function ExchangesView() {
                       </div>
                     )}
                     {e.discountPercent > 0 && (
-                      <div className="flex items-center justify-between text-sm pt-1 border-t">
+                      <div className="flex items-center justify-between text-xs sm:text-sm pt-1 border-t">
                         <span className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400">
                           <Sparkles className="h-3 w-3" />
                           {e.discountLabel ?? 'Descuento'}
@@ -248,7 +248,7 @@ export function ExchangesView() {
                     )}
                   </div>
                   {e.notes && (
-                    <p className="text-xs text-muted-foreground italic border-t pt-2 line-clamp-3">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground italic border-t pt-1.5 sm:pt-2 line-clamp-2">
                       {e.notes}
                     </p>
                   )}

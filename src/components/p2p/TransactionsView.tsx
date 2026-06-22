@@ -187,39 +187,39 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
     mode === 'venta' ? 'venta' : 'compra'
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-2.5 sm:space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
         <Card className="p-0">
-          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
-            <CardDescription className="text-[10px] sm:text-xs">Operaciones</CardDescription>
-            <CardTitle className="text-base sm:text-2xl tabular-nums leading-tight">
+          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+            <CardDescription className="text-[9px] sm:text-xs">Operaciones</CardDescription>
+            <CardTitle className="text-sm sm:text-2xl tabular-nums leading-tight">
               {filtered.length}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="p-0">
-          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
-            <CardDescription className="text-[10px] sm:text-xs">Volumen bruto</CardDescription>
-            <CardTitle className="text-base sm:text-2xl tabular-nums leading-tight">
+          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+            <CardDescription className="text-[9px] sm:text-xs">Volumen bruto</CardDescription>
+            <CardTitle className="text-sm sm:text-2xl tabular-nums leading-tight">
               {formatCurrency(totalFiat)}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="p-0">
-          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[10px] sm:text-xs">
+          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
               <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" /> Comisiones
             </CardDescription>
-            <CardTitle className="text-base sm:text-2xl tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
+            <CardTitle className="text-sm sm:text-2xl tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
               {formatCurrency(totalFees)}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="p-0">
-          <CardHeader className="p-2.5 sm:p-3 pb-1.5 sm:pb-2">
-            <CardDescription className="text-[10px] sm:text-xs">Volumen neto</CardDescription>
-            <CardTitle className="text-base sm:text-2xl tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
+          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+            <CardDescription className="text-[9px] sm:text-xs">Volumen neto</CardDescription>
+            <CardTitle className="text-sm sm:text-2xl tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
               {formatCurrency(totalNeto)}
             </CardTitle>
           </CardHeader>
@@ -234,7 +234,7 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
             {mode === 'venta' && <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500" />}
             {title}
           </h2>
-          <p className="text-xs sm:text-sm text-muted-foreground">{description}</p>
+          <p className="text-[11px] sm:text-sm text-muted-foreground">{description}</p>
         </div>
         <Button onClick={openNew} size="sm" className="self-start">
           <Plus className="mr-1 h-4 w-4" />
@@ -243,30 +243,30 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+      <div className="grid grid-cols-2 sm:flex sm:flex-row gap-1.5 sm:gap-2">
+        <div className="relative col-span-2 sm:flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar contraparte, activo, referencia..."
+            placeholder="Buscar contraparte, activo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
+            className="pl-8 h-9 text-sm"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
             <Filter className="mr-1 h-3.5 w-3.5" />
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="completada">Completadas</SelectItem>
             <SelectItem value="pendiente">Pendientes</SelectItem>
             <SelectItem value="cancelada">Canceladas</SelectItem>
           </SelectContent>
         </Select>
         <Select value={bankFilter} onValueChange={setBankFilter}>
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
             <SelectValue placeholder="Banco" />
           </SelectTrigger>
           <SelectContent>
@@ -279,11 +279,11 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
           </SelectContent>
         </Select>
         <Select value={exchangeFilter} onValueChange={setExchangeFilter}>
-          <SelectTrigger className="w-full sm:w-44">
+          <SelectTrigger className="w-full sm:w-36 h-9 text-sm col-span-2 sm:col-span-1">
             <SelectValue placeholder="Exchange" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los exchanges</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="__none__">Sin exchange</SelectItem>
             {exchanges.map((e) => (
               <SelectItem key={e.id} value={e.id}>
@@ -294,190 +294,328 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
         </Select>
       </div>
 
-      {/* Tabla */}
+      {/* Tabla en desktop / cards en móvil */}
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 space-y-2">
+            <div className="p-4 sm:p-8 space-y-2">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-12 rounded bg-muted/40 animate-pulse" />
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Inbox className="h-12 w-12 text-muted-foreground/50 mb-3" />
-              <p className="font-medium">No hay transacciones</p>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+              <Inbox className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
+              <p className="font-medium text-sm">No hay transacciones</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-sm px-4">
                 {search || statusFilter !== 'all' || bankFilter !== 'all' || exchangeFilter !== 'all'
                   ? 'No se encontraron resultados con los filtros actuales.'
                   : `Registra tu primera ${mode === 'venta' ? 'venta' : mode === 'compra' ? 'compra' : 'operación'} para empezar a llevar el control.`}
               </p>
               {!search && statusFilter === 'all' && bankFilter === 'all' && exchangeFilter === 'all' && (
-                <Button onClick={openNew} className="mt-4">
+                <Button onClick={openNew} size="sm" className="mt-4">
                   <Plus className="mr-1 h-4 w-4" />
                   {mode === 'venta' ? 'Registrar venta' : 'Registrar compra'}
                 </Button>
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[100px]">Tipo</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Contraparte</TableHead>
-                    <TableHead>Exchange</TableHead>
-                    <TableHead className="text-right">Activo</TableHead>
-                    <TableHead className="text-right">Tasa</TableHead>
-                    <TableHead className="text-right">Bruto</TableHead>
-                    <TableHead className="text-right">Comisión</TableHead>
-                    <TableHead className="text-right">Neto</TableHead>
-                    <TableHead>Bancos</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((t) => (
-                    <TableRow key={t.id} className="hover:bg-muted/40">
-                      <TableCell>
+            <>
+              {/* MOBILE: cards verticales */}
+              <div className="sm:hidden divide-y">
+                {filtered.map((t) => (
+                  <div key={t.id} className="p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <Badge
                           variant="outline"
                           className={
                             t.type === 'compra'
-                              ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300'
-                              : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300'
+                              ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300 text-[9px] px-1.5 py-0'
+                              : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300 text-[9px] px-1.5 py-0'
                           }
                         >
                           {t.type === 'compra' ? 'Compra' : 'Venta'}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">
-                        {formatDate(t.date, true)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium truncate max-w-[180px]">
-                          {t.counterparty}
-                        </div>
-                        {t.reference && (
-                          <div className="text-xs text-muted-foreground font-mono">
-                            Ref: {t.reference}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {t.exchange ? (
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {formatDate(t.date, true)}
+                        </span>
+                      </div>
+                      <div className="flex gap-0.5 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => openEdit(t)}
+                          title="Editar"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 hover:text-rose-600"
+                          onClick={() => setDeleting(t)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm truncate">{t.counterparty}</span>
+                      {t.exchange && (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] flex-shrink-0"
+                          style={{ backgroundColor: `${t.exchange.color}22` }}
+                          title={t.exchange.name}
+                        >
                           <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
-                            style={{ backgroundColor: `${t.exchange.color}22` }}
-                            title={t.exchange.name}
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: t.exchange.color }}
+                          />
+                          {t.exchange.shortName ?? t.exchange.name}
+                        </span>
+                      )}
+                    </div>
+                    {t.reference && (
+                      <p className="text-[10px] text-muted-foreground font-mono truncate">
+                        Ref: {t.reference}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="tabular-nums">
+                        {formatNumber(t.amount, 2)} <span className="text-muted-foreground">{t.asset}</span>
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">
+                        @{formatNumber(t.rate, 2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Bruto</span>
+                      <span className="font-medium tabular-nums">
+                        {formatCurrency(t.total, t.currency)}
+                      </span>
+                    </div>
+                    {t.fee > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Comisión</span>
+                        <span className="text-amber-600 dark:text-amber-400 tabular-nums">
+                          −{formatCurrency(t.fee, t.currency)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Neto</span>
+                      <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                      <div className="flex items-center gap-1 text-[10px] min-w-0">
+                        {t.fromBank && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded truncate"
+                            style={{ backgroundColor: `${t.fromBank.color}22` }}
+                            title={`Origen: ${t.fromBank.name}`}
                           >
                             <span
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: t.exchange.color }}
+                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: t.fromBank.color }}
                             />
-                            {t.exchange.shortName ?? t.exchange.name}
+                            <span className="truncate">{t.fromBank.name}</span>
                           </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums whitespace-nowrap">
-                        <div className="font-medium">
-                          {formatNumber(t.amount, 2)}{' '}
-                          <span className="text-xs text-muted-foreground">
-                            {t.asset}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">
-                        {formatNumber(t.rate, 2)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
-                        {formatCurrency(t.total, t.currency)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs whitespace-nowrap">
-                        {t.fee > 0 ? (
-                          <span className="text-amber-600 dark:text-amber-400">
-                            −{formatCurrency(t.fee, t.currency)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-xs">
-                          {t.fromBank ? (
+                        {t.toBank && (
+                          <>
+                            <span className="text-muted-foreground flex-shrink-0">→</span>
                             <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
-                              style={{ backgroundColor: `${t.fromBank.color}22` }}
-                              title={`Origen: ${t.fromBank.name}`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded truncate"
+                              style={{ backgroundColor: `${t.toBank.color}22` }}
+                              title={`Destino: ${t.toBank.name}`}
+                            >
+                              <span
+                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: t.toBank.color }}
+                              />
+                              <span className="truncate">{t.toBank.name}</span>
+                            </span>
+                          </>
+                        )}
+                        {!t.fromBank && !t.toBank && (
+                          <span className="text-muted-foreground">Sin bancos</span>
+                        )}
+                      </div>
+                      <span
+                        className={`inline-block px-1.5 py-0.5 rounded text-[9px] flex-shrink-0 ${STATUS_COLORS[t.status]}`}
+                      >
+                        {STATUS_LABELS[t.status]}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* DESKTOP: tabla */}
+              <div className="hidden sm:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">Tipo</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Contraparte</TableHead>
+                      <TableHead>Exchange</TableHead>
+                      <TableHead className="text-right">Activo</TableHead>
+                      <TableHead className="text-right">Tasa</TableHead>
+                      <TableHead className="text-right">Bruto</TableHead>
+                      <TableHead className="text-right">Comisión</TableHead>
+                      <TableHead className="text-right">Neto</TableHead>
+                      <TableHead>Bancos</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="w-[80px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((t) => (
+                      <TableRow key={t.id} className="hover:bg-muted/40">
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              t.type === 'compra'
+                                ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300'
+                                : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300'
+                            }
+                          >
+                            {t.type === 'compra' ? 'Compra' : 'Venta'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {formatDate(t.date, true)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium truncate max-w-[180px]">
+                            {t.counterparty}
+                          </div>
+                          {t.reference && (
+                            <div className="text-xs text-muted-foreground font-mono">
+                              Ref: {t.reference}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {t.exchange ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                              style={{ backgroundColor: `${t.exchange.color}22` }}
+                              title={t.exchange.name}
                             >
                               <span
                                 className="w-1.5 h-1.5 rounded-full"
-                                style={{ backgroundColor: t.fromBank.color }}
+                                style={{ backgroundColor: t.exchange.color }}
                               />
-                              {t.fromBank.name}
+                              {t.exchange.shortName ?? t.exchange.name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+                          <div className="font-medium">
+                            {formatNumber(t.amount, 2)}{' '}
+                            <span className="text-xs text-muted-foreground">
+                              {t.asset}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">
+                          {formatNumber(t.rate, 2)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
+                          {formatCurrency(t.total, t.currency)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs whitespace-nowrap">
+                          {t.fee > 0 ? (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              −{formatCurrency(t.fee, t.currency)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
-                          {t.toBank && (
-                            <>
-                              <span className="text-muted-foreground">→</span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-xs">
+                            {t.fromBank ? (
                               <span
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
-                                style={{ backgroundColor: `${t.toBank.color}22` }}
-                                title={`Destino: ${t.toBank.name}`}
+                                style={{ backgroundColor: `${t.fromBank.color}22` }}
+                                title={`Origen: ${t.fromBank.name}`}
                               >
                                 <span
                                   className="w-1.5 h-1.5 rounded-full"
-                                  style={{ backgroundColor: t.toBank.color }}
+                                  style={{ backgroundColor: t.fromBank.color }}
                                 />
-                                {t.toBank.name}
+                                {t.fromBank.name}
                               </span>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded text-xs ${STATUS_COLORS[t.status]}`}
-                        >
-                          {STATUS_LABELS[t.status]}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-0.5">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => openEdit(t)}
-                            title="Editar"
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                            {t.toBank && (
+                              <>
+                                <span className="text-muted-foreground">→</span>
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+                                  style={{ backgroundColor: `${t.toBank.color}22` }}
+                                  title={`Destino: ${t.toBank.name}`}
+                                >
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full"
+                                    style={{ backgroundColor: t.toBank.color }}
+                                  />
+                                  {t.toBank.name}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-xs ${STATUS_COLORS[t.status]}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 hover:text-rose-600"
-                            onClick={() => setDeleting(t)}
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                            {STATUS_LABELS[t.status]}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-0.5">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => openEdit(t)}
+                              title="Editar"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:text-rose-600"
+                              onClick={() => setDeleting(t)}
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
