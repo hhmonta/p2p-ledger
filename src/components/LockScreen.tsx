@@ -117,7 +117,13 @@ export function LockScreen({ mode = 'unlock', onSetupComplete, onCancel }: LockS
       : 'Ingresa tu PIN para desbloquear'
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-6">
+    <div
+      className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-6"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
       {/* Icono */}
       <div className="mb-8 flex flex-col items-center gap-3">
         <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">

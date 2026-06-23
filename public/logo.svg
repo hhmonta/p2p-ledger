@@ -1,26 +1,128 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
+    <!-- Fondo: degradado esmeralda -> teal oscuro -->
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#0f766e"/>
     </linearGradient>
+    <!-- Tapa del libro: navy slate -->
+    <linearGradient id="bookCover" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <!-- Páginas: blanco cálido -->
+    <linearGradient id="pages" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fefce8"/>
+      <stop offset="100%" stop-color="#fef3c7"/>
+    </linearGradient>
+    <!-- Moneda dorada -->
     <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#fde68a"/>
       <stop offset="50%" stop-color="#fbbf24"/>
       <stop offset="100%" stop-color="#d97706"/>
     </linearGradient>
+    <!-- Sombra suave -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="0" dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
-  <g>
-    <rect x="128" y="180" width="216" height="36" rx="18" fill="url(#bg)"/>
-    <polygon points="344,158 392,198 344,238" fill="url(#bg)"/>
-    <rect x="168" y="296" width="216" height="36" rx="18" fill="url(#bg)"/>
-    <polygon points="168,274 120,314 168,354" fill="url(#bg)"/>
-    <circle cx="256" cy="256" r="58" fill="url(#gold)" stroke="#ffffff" stroke-width="5"/>
-    <text x="256" y="256"
+
+  <!-- Fondo redondeado -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Libro contable abierto (vista frontal) -->
+  <g filter="url(#shadow)">
+    <!-- Sombra base del libro -->
+    <rect x="112" y="156" width="288" height="220" rx="14" fill="#0f172a" opacity="0.45"/>
+
+    <!-- Tapa izquierda -->
+    <path d="M 112 168
+             Q 112 156 124 156
+             L 252 168
+             L 252 372
+             L 124 372
+             Q 112 372 112 360
+             Z"
+          fill="url(#bookCover)"/>
+
+    <!-- Tapa derecha -->
+    <path d="M 400 168
+             Q 400 156 388 156
+             L 260 168
+             L 260 372
+             L 388 372
+             Q 400 372 400 360
+             Z"
+          fill="url(#bookCover)"/>
+
+    <!-- Páginas izquierdas -->
+    <path d="M 124 172
+             L 248 182
+             L 248 364
+             L 124 364
+             Z"
+          fill="url(#pages)"/>
+
+    <!-- Páginas derechas -->
+    <path d="M 264 182
+             L 388 172
+             L 388 364
+             L 264 364
+             Z"
+          fill="url(#pages)"/>
+
+    <!-- Línea central (lomo) -->
+    <line x1="256" y1="170" x2="256" y2="366" stroke="#0f172a" stroke-width="3" opacity="0.55"/>
+
+    <!-- Líneas de texto en página izquierda -->
+    <g stroke="#92400e" stroke-width="3" opacity="0.55" stroke-linecap="round">
+      <line x1="138" y1="206" x2="232" y2="212"/>
+      <line x1="138" y1="226" x2="220" y2="231"/>
+      <line x1="138" y1="246" x2="236" y2="251"/>
+      <line x1="138" y1="266" x2="210" y2="271"/>
+      <line x1="138" y1="286" x2="228" y2="291"/>
+      <line x1="138" y1="306" x2="218" y2="311"/>
+      <line x1="138" y1="326" x2="232" y2="331"/>
+    </g>
+
+    <!-- Líneas de texto en página derecha -->
+    <g stroke="#92400e" stroke-width="3" opacity="0.55" stroke-linecap="round">
+      <line x1="280" y1="212" x2="374" y2="206"/>
+      <line x1="280" y1="231" x2="362" y2="226"/>
+      <line x1="280" y1="251" x2="378" y2="246"/>
+      <line x1="280" y1="271" x2="352" y2="266"/>
+      <line x1="280" y1="291" x2="370" y2="286"/>
+      <line x1="280" y1="311" x2="360" y2="306"/>
+      <line x1="280" y1="331" x2="374" y2="326"/>
+    </g>
+
+    <!-- Marcador / listón verde en la parte superior derecha -->
+    <path d="M 350 156 L 374 156 L 374 210 L 362 198 L 350 210 Z"
+          fill="#34d399" opacity="0.95"/>
+  </g>
+
+  <!-- Moneda dorada flotante en el centro-superior -->
+  <g filter="url(#shadow)">
+    <circle cx="256" cy="138" r="58" fill="url(#gold)" stroke="#ffffff" stroke-width="5"/>
+    <text x="256" y="138"
           font-family="'Segoe UI', Roboto, Arial, sans-serif"
-          font-size="56" font-weight="700"
+          font-size="60" font-weight="700"
           text-anchor="middle" dominant-baseline="central"
           fill="#78350f">$</text>
+  </g>
+
+  <!-- Pequeñas monedas decorativas (representan transacciones P2P) -->
+  <g opacity="0.9">
+    <circle cx="100" cy="100" r="14" fill="url(#gold)" stroke="#ffffff" stroke-width="2"/>
+    <circle cx="412" cy="100" r="14" fill="url(#gold)" stroke="#ffffff" stroke-width="2"/>
+    <circle cx="100" cy="412" r="14" fill="url(#gold)" stroke="#ffffff" stroke-width="2"/>
+    <circle cx="412" cy="412" r="14" fill="url(#gold)" stroke="#ffffff" stroke-width="2"/>
   </g>
 </svg>

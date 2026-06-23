@@ -79,7 +79,10 @@ function SecurityButton() {
 
 function Header() {
   return (
-    <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+    <header
+      className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <div className="container mx-auto px-2 py-1.5 sm:px-4 sm:py-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm flex-shrink-0">
@@ -181,7 +184,10 @@ function AppContent() {
         </Tabs>
       </main>
 
-      <footer className="border-t bg-background mt-auto">
+      <footer
+        className="border-t bg-background mt-auto"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         <div className="container mx-auto px-2 py-1.5 sm:px-4 sm:py-3 text-[9px] sm:text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-2">
           <p>
             <span className="font-medium text-foreground">P2P Ledger</span> · Registro local de operaciones
