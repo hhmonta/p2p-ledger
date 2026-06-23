@@ -7,7 +7,7 @@ import { Dashboard } from '@/components/p2p/Dashboard'
 import { BanksView } from '@/components/p2p/BanksView'
 import { ExchangesView } from '@/components/p2p/ExchangesView'
 import { TransactionsView } from '@/components/p2p/TransactionsView'
-import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered, Building2, Shield } from 'lucide-react'
+import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered, Building2, Shield, Download } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AuthProvider, useAuth } from '@/lib/auth-context'
 import { LockScreen } from '@/components/LockScreen'
@@ -103,6 +103,14 @@ function Header() {
           <span>Datos en tu dispositivo</span>
         </div>
         <div className="flex items-center gap-1">
+          <a
+            href="/P2P-Ledger-v1.0.apk"
+            download="P2P-Ledger-v1.0.apk"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-emerald-500 hover:bg-accent transition-colors"
+            title="Descargar APK"
+          >
+            <Download className="h-4 w-4" />
+          </a>
           <SecurityButton />
           <ThemeToggle />
         </div>
