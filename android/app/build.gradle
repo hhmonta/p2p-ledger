@@ -30,6 +30,9 @@ android {
                 keyPassword = keystoreProperties['keyPassword']
                 storeFile = rootProject.file(keystoreProperties['storeFile'])
                 storePassword = keystoreProperties['storePassword']
+                // Forzar v1 + v2 + v3 signing para máxima compatibilidad y Play Protect
+                v1SigningEnabled true
+                v2SigningEnabled true
             }
         }
     }
@@ -42,6 +45,8 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
+            // Asegurar que NO sea debuggable
+            debuggable false
         }
     }
 }
