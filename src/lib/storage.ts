@@ -25,7 +25,7 @@ const TX_KEY = 'p2p:transactions'
 const EXCHANGES_KEY = 'p2p:exchanges'
 const VERSION_KEY = 'p2p:version'
 
-const CURRENT_VERSION = '4'
+const CURRENT_VERSION = '5'
 
 // Claves cuyos valores se cifran cuando hay DEK activa
 const ENCRYPTED_KEYS = new Set<string>([BANKS_KEY, TX_KEY, EXCHANGES_KEY])
@@ -165,22 +165,27 @@ function ensureInit() {
   const version = window.localStorage.getItem(VERSION_KEY)
   if (version !== CURRENT_VERSION) {
     // Si vienen de una versión anterior, migrar exchanges existentes
-    if (version === '2' || version === '3') {
+    // v3 → v4: añadimos Bybit, KuCoin y Paxful si no existen
+    if (version === '3') {
       const existing = readJSONSync<Exchange[]>(EXCHANGES_KEY, [])
       const migrated = existing.map(migrateExchange)
-      // En la migración v3 → v4 añadimos Bybit, KuCoin y Paxful si no existen
-      if (version === '3') {
-        const existingNames = new Set(migrated.map((e) => e.name.toLowerCase()))
-        const additions = defaultExchanges().filter(
-          (e) => !existingNames.has(e.name.toLowerCase())
-        )
-        // Solo añadimos los nuevos (Bybit, KuCoin, Paxful) - no duplicamos los antiguos
-        const newOnes = additions.filter((e) =>
-          ['Bybit P2P', 'KuCoin P2P', 'Paxful', 'Bybit Spot', 'KuCoin Spot'].includes(e.name)
-        )
-        writeJSON(EXCHANGES_KEY, [...migrated, ...newOnes])
-      } else {
-        writeJSON(EXCHANGES_KEY, migrated)
+      const existingNames = new Set(migrated.map((e) => e.name.toLowerCase()))
+      const additions = defaultExchanges().filter(
+        (e) => !existingNames.has(e.name.toLowerCase())
+      )
+      // Solo añadimos los nuevos (Bybit, KuCoin, Paxful) - no duplicamos los antiguos
+      const newOnes = additions.filter((e) =>
+        ['Bybit P2P', 'KuCoin P2P', 'Paxful', 'Bybit Spot', 'KuCoin Spot'].includes(e.name)
+      )
+      writeJSON(EXCHANGES_KEY, [...migrated, ...newOnes])
+    }
+    // v4 → v5: añadimos P2p.me si no existe
+    if (version === '4') {
+      const existing = readJSONSync<Exchange[]>(EXCHANGES_KEY, []).map(migrateExchange)
+      const existingNames = new Set(existing.map((e) => e.name.toLowerCase()))
+      const p2pme = defaultExchanges().find((e) => e.name === 'P2p.me')!
+      if (!existingNames.has('p2p.me')) {
+        writeJSON(EXCHANGES_KEY, [...existing, p2pme])
       }
     }
     // Si es primera instalación (sin versión), sembrar exchanges por defecto
@@ -452,6 +457,26 @@ function defaultExchanges(): Exchange[] {
       discountLabel: null,
       isActive: true,
       notes: 'Paxful cobra comisión al vendedor (varía por método de pago: gift cards 1-5%, banca 0.5-1%). Comprador no paga comisión a Paxful.',
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid(),
+      name: 'P2p.me',
+      shortName: 'P2P',
+      color: '#6c5ce7',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      buyTiers: [],
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0,
+      sellTiers: [],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
+      isActive: true,
+      notes: 'P2p.me es un marketplace P2P para compra y venta de criptomonedas. No cobra comisión directa al usuario en operaciones P2P.',
       createdAt: now,
       updatedAt: now,
     },
