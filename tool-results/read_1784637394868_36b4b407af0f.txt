@@ -1,0 +1,854 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo } from 'react'
+     4→import { useForm } from 'react-hook-form'
+     5→import { zodResolver } from '@hookform/resolvers/zod'
+     6→import { z } from 'zod'
+     7→import {
+     8→  Dialog,
+     9→  DialogContent,
+    10→  DialogDescription,
+    11→  DialogFooter,
+    12→  DialogHeader,
+    13→  DialogTitle,
+    14→} from '@/components/ui/dialog'
+    15→import {
+    16→  Form,
+    17→  FormControl,
+    18→  FormDescription,
+    19→  FormField,
+    20→  FormItem,
+    21→  FormLabel,
+    22→  FormMessage,
+    23→} from '@/components/ui/form'
+    24→import { Input } from '@/components/ui/input'
+    25→import { Button } from '@/components/ui/button'
+    26→import {
+    27→  Select,
+    28→  SelectContent,
+    29→  SelectItem,
+    30→  SelectTrigger,
+    31→  SelectValue,
+    32→} from '@/components/ui/select'
+    33→import { Textarea } from '@/components/ui/textarea'
+    34→import { Loader2, ArrowRight, Sparkles, Lock, Unlock } from 'lucide-react'
+    35→import type {
+    36→  Bank,
+    37→  Exchange,
+    38→  Transaction,
+    39→  TransactionInput,
+    40→  TransactionType,
+    41→  TransactionStatus,
+    42→} from '@/lib/types'
+    43→import { toast } from '@/hooks/use-toast'
+    44→import { formatCurrency, formatNumber, toDateTimeInputValue } from '@/lib/format'
+    45→import * as storage from '@/lib/storage'
+    46→
+    47→const txSchema = z.object({
+    48→  type: z.enum(['compra', 'venta']),
+    49→  counterparty: z.string().min(1, 'La contraparte es obligatoria'),
+    50→  asset: z.string().min(1, 'El activo es obligatorio'),
+    51→  amount: z.coerce.number().positive('Debe ser > 0'),
+    52→  rate: z.coerce.number().positive('Debe ser > 0'),
+    53→  currency: z.string().min(1),
+    54→  fromBankId: z.string().optional().nullable(),
+    55→  toBankId: z.string().optional().nullable(),
+    56→  exchangeId: z.string().optional().nullable(),
+    57→  status: z.enum(['pendiente', 'completada', 'cancelada']),
+    58→  reference: z.string().optional(),
+    59→  fee: z.coerce.number().min(0).default(0),
+    60→  date: z.string().min(1),
+    61→  notes: z.string().optional(),
+    62→})
+    63→
+    64→type FormValues = z.infer<typeof txSchema>
+    65→
+    66→const ASSETS = ['USDT', 'USDC', 'BTC', 'ETH', 'BNB', 'USD', 'EUR', 'COP']
+    67→const CURRENCIES = ['VES', 'USD', 'EUR', 'COP', 'ARS', 'PEN', 'MXN', 'BRL']
+    68→
+    69→interface TransactionFormProps {
+    70→  open: boolean
+    71→  onOpenChange: (open: boolean) => void
+    72→  transaction?: Transaction | null
+    73→  defaultType?: TransactionType
+    74→  banks: Bank[]
+    75→  onSaved: () => void
+    76→}
+    77→
+    78→export function TransactionForm({
+    79→  open,
+    80→  onOpenChange,
+    81→  transaction,
+    82→  defaultType = 'compra',
+    83→  banks,
+    84→  onSaved,
+    85→}: TransactionFormProps) {
+    86→  const [submitting, setSubmitting] = useState(false)
+    87→  const [exchanges, setExchanges] = useState<Exchange[]>([])
+    88→  const [feeLocked, setFeeLocked] = useState(false) // si true, el fee NO se recalcula al cambiar inputs
+    89→
+    90→  const activeBanks = useMemo(() => banks.filter((b) => b.isActive), [banks])
+    91→  const activeExchanges = useMemo(() => exchanges.filter((e) => e.isActive), [exchanges])
+    92→
+    93→  // Cargar exchanges
+    94→  useEffect(() => {
+    95→    storage.listExchanges().then(setExchanges).catch(() => {})
+    96→  }, [open])
+    97→
+    98→  const form = useForm<FormValues>({
+    99→    resolver: zodResolver(txSchema),
+   100→    defaultValues: {
+   101→      type: defaultType,
+   102→      counterparty: '',
+   103→      asset: 'USDT',
+   104→      amount: 0,
+   105→      rate: 0,
+   106→      currency: 'VES',
+   107→      fromBankId: null,
+   108→      toBankId: null,
+   109→      exchangeId: null,
+   110→      status: 'completada',
+   111→      reference: '',
+   112→      fee: 0,
+   113→      date: toDateTimeInputValue(new Date()),
+   114→      notes: '',
+   115→    },
+   116→  })
+   117→
+   118→  useEffect(() => {
+   119→    if (open) {
+   120→      if (transaction) {
+   121→        form.reset({
+   122→          type: transaction.type,
+   123→          counterparty: transaction.counterparty,
+   124→          asset: transaction.asset,
+   125→          amount: transaction.amount,
+   126→          rate: transaction.rate,
+   127→          currency: transaction.currency,
+   128→          fromBankId: transaction.fromBankId ?? null,
+   129→          toBankId: transaction.toBankId ?? null,
+   130→          exchangeId: transaction.exchangeId ?? null,
+   131→          status: transaction.status,
+   132→          reference: transaction.reference ?? '',
+   133→          fee: transaction.fee,
+   134→          date: toDateTimeInputValue(transaction.date),
+   135→          notes: transaction.notes ?? '',
+   136→        })
+   137→        // Al editar, consideramos el fee como bloqueado (es el valor guardado)
+   138→        setFeeLocked(true)
+   139→      } else {
+   140→        form.reset({
+   141→          type: defaultType,
+   142→          counterparty: '',
+   143→          asset: 'USDT',
+   144→          amount: 0,
+   145→          rate: 0,
+   146→          currency: 'VES',
+   147→          fromBankId: null,
+   148→          toBankId: null,
+   149→          exchangeId: null,
+   150→          status: 'completada',
+   151→          reference: '',
+   152→          fee: 0,
+   153→          date: toDateTimeInputValue(new Date()),
+   154→          notes: '',
+   155→        })
+   156→        setFeeLocked(false)
+   157→      }
+   158→    }
+   159→  }, [open, transaction, defaultType, form])
+   160→
+   161→  const watchedAmount = form.watch('amount')
+   162→  const watchedRate = form.watch('rate')
+   163→  const watchedCurrency = form.watch('currency')
+   164→  const watchedAsset = form.watch('asset')
+   165→  const watchedType = form.watch('type')
+   166→  const watchedExchangeId = form.watch('exchangeId')
+   167→  const watchedFee = form.watch('fee')
+   168→
+   169→  const total = (Number(watchedAmount) || 0) * (Number(watchedRate) || 0)
+   170→
+   171→  // Cálculo automático de comisión cuando cambia exchange, monto, tasa o tipo
+   172→  // (solo si el fee NO está bloqueado manualmente)
+   173→  useEffect(() => {
+   174→    if (feeLocked) return
+   175→    if (!watchedExchangeId || watchedExchangeId === '__none') {
+   176→      form.setValue('fee', 0)
+   177→      return
+   178→    }
+   179→    const ex = exchanges.find((e) => e.id === watchedExchangeId)
+   180→    if (!ex) return
+   181→    const calc = storage.calculateFee(ex, watchedType, total)
+   182→    form.setValue('fee', Number(calc.total.toFixed(6)))
+   183→  }, [watchedExchangeId, watchedAmount, watchedRate, watchedType, exchanges, total, feeLocked, form])
+   184→
+   185→  // Al cambiar de exchange manualmente, desbloquear fee para recalcular
+   186→  function handleExchangeChange(v: string) {
+   187→    const value = v === '__none' ? null : v
+   188→    form.setValue('exchangeId', value)
+   189→    setFeeLocked(false) // si cambias exchange, se recalcula
+   190→  }
+   191→
+   192→  function unlockFee() {
+   193→    setFeeLocked(false)
+   194→  }
+   195→
+   196→  function lockFee() {
+   197→    setFeeLocked(true)
+   198→  }
+   199→
+   200→  async function onSubmit(values: FormValues) {
+   201→    setSubmitting(true)
+   202→    try {
+   203→      const payload: TransactionInput = {
+   204→        type: values.type,
+   205→        counterparty: values.counterparty,
+   206→        asset: values.asset,
+   207→        amount: Number(values.amount),
+   208→        rate: Number(values.rate),
+   209→        currency: values.currency,
+   210→        fromBankId: values.fromBankId || null,
+   211→        toBankId: values.toBankId || null,
+   212→        exchangeId: values.exchangeId || null,
+   213→        status: values.status,
+   214→        reference: values.reference || null,
+   215→        fee: Number(values.fee),
+   216→        date: new Date(values.date).toISOString(),
+   217→        notes: values.notes || null,
+   218→      }
+   219→
+   220→      if (transaction) {
+   221→        await storage.updateTransaction(transaction.id, payload)
+   222→      } else {
+   223→        await storage.createTransaction(payload)
+   224→      }
+   225→
+   226→      toast({
+   227→        title: transaction
+   228→          ? 'Transacción actualizada'
+   229→          : values.type === 'compra'
+   230→            ? 'Compra registrada'
+   231→            : 'Venta registrada',
+   232→        description: `${values.type === 'compra' ? 'Compra' : 'Venta'} de ${formatNumber(values.amount)} ${values.asset} con ${values.counterparty}.`,
+   233→      })
+   234→      onSaved()
+   235→      onOpenChange(false)
+   236→    } catch (e) {
+   237→      toast({
+   238→        title: 'Error',
+   239→        description: e instanceof Error ? e.message : 'Error desconocido',
+   240→        variant: 'destructive',
+   241→      })
+   242→    } finally {
+   243→      setSubmitting(false)
+   244→    }
+   245→  }
+   246→
+   247→  // Neto (total menos comisión)
+   248→  const fee = Number(watchedFee) || 0
+   249→  const netTotal = total - fee
+   250→
+   251→  return (
+   252→    <Dialog open={open} onOpenChange={onOpenChange}>
+   253→      <DialogContent className="sm:max-w-[640px] max-h-[92vh] overflow-y-auto">
+   254→        <DialogHeader>
+   255→          <DialogTitle>
+   256→            {transaction
+   257→              ? 'Editar transacción'
+   258→              : defaultType === 'compra'
+   259→                ? 'Nueva compra P2P'
+   260→                : 'Nueva venta P2P'}
+   261→          </DialogTitle>
+   262→          <DialogDescription>
+   263→            {watchedType === 'compra'
+   264→              ? 'Registra una compra: tú envías moneda fiat y recibes el activo.'
+   265→              : 'Registra una venta: tú envías el activo y recibes moneda fiat.'}
+   266→          </DialogDescription>
+   267→        </DialogHeader>
+   268→
+   269→        <Form {...form}>
+   270→          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+   271→            {/* Tipo de operación */}
+   272→            <FormField
+   273→              control={form.control}
+   274→              name="type"
+   275→              render={({ field }) => (
+   276→                <FormItem>
+   277→                  <FormLabel>Tipo de operación</FormLabel>
+   278→                  <div className="grid grid-cols-2 gap-2">
+   279→                    <button
+   280→                      type="button"
+   281→                      onClick={() => {
+   282→                        field.onChange('compra')
+   283→                        setFeeLocked(false) // recalcular fee con nuevo tipo
+   284→                      }}
+   285→                      className={`rounded-lg border-2 p-3 text-sm font-medium transition ${
+   286→                        field.value === 'compra'
+   287→                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+   288→                          : 'border-border hover:border-emerald-300'
+   289→                      }`}
+   290→                    >
+   291→                      Compra
+   292→                    </button>
+   293→                    <button
+   294→                      type="button"
+   295→                      onClick={() => {
+   296→                        field.onChange('venta')
+   297→                        setFeeLocked(false)
+   298→                      }}
+   299→                      className={`rounded-lg border-2 p-3 text-sm font-medium transition ${
+   300→                        field.value === 'venta'
+   301→                          ? 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+   302→                          : 'border-border hover:border-rose-300'
+   303→                      }`}
+   304→                    >
+   305→                      Venta
+   306→                    </button>
+   307→                  </div>
+   308→                  <FormMessage />
+   309→                </FormItem>
+   310→              )}
+   311→            />
+   312→
+   313→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   314→              <FormField
+   315→                control={form.control}
+   316→                name="counterparty"
+   317→                render={({ field }) => (
+   318→                  <FormItem className="sm:col-span-2">
+   319→                    <FormLabel>Contraparte *</FormLabel>
+   320→                    <FormControl>
+   321→                      <Input
+   322→                        placeholder="Persona o plataforma (ej: @usuario, Binance P2P, etc.)"
+   323→                        {...field}
+   324→                      />
+   325→                    </FormControl>
+   326→                    <FormMessage />
+   327→                  </FormItem>
+   328→                )}
+   329→              />
+   330→
+   331→              {/* EXCHANGE */}
+   332→              <FormField
+   333→                control={form.control}
+   334→                name="exchangeId"
+   335→                render={({ field }) => (
+   336→                  <FormItem className="sm:col-span-2">
+   337→                    <FormLabel className="flex items-center gap-1.5">
+   338→                      <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+   339→                      Exchange / Plataforma
+   340→                    </FormLabel>
+   341→                    <Select
+   342→                      onValueChange={handleExchangeChange}
+   343→                      value={field.value ?? '__none'}
+   344→                    >
+   345→                      <FormControl>
+   346→                        <SelectTrigger>
+   347→                          <SelectValue placeholder="Sin exchange específico" />
+   348→                        </SelectTrigger>
+   349→                      </FormControl>
+   350→                      <SelectContent>
+   351→                        <SelectItem value="__none">Sin exchange (manual)</SelectItem>
+   352→                        {activeExchanges.map((e) => (
+   353→                          <SelectItem key={e.id} value={e.id}>
+   354→                            <span className="flex items-center gap-2">
+   355→                              <span
+   356→                                className="inline-block w-2 h-2 rounded-full"
+   357→                                style={{ backgroundColor: e.color }}
+   358→                              />
+   359→                              {e.name}
+   360→                              <span className="text-xs text-muted-foreground ml-1">
+   361→                                {watchedType === 'compra'
+   362→                                  ? e.buyFeeType === 'percent'
+   363→                                    ? `${e.buyFeeValue}%`
+   364→                                    : `fijo ${e.buyFeeValue}`
+   365→                                  : e.sellFeeType === 'percent'
+   366→                                    ? `${e.sellFeeValue}%`
+   367→                                    : `fijo ${e.sellFeeValue}`}
+   368→                              </span>
+   369→                            </span>
+   370→                          </SelectItem>
+   371→                        ))}
+   372→                      </SelectContent>
+   373→                    </Select>
+   374→                    <FormDescription>
+   375→                      Selecciona el exchange para calcular la comisión automáticamente. Puedes
+   376→                      ajustarla después.
+   377→                    </FormDescription>
+   378→                    <FormMessage />
+   379→                  </FormItem>
+   380→                )}
+   381→              />
+   382→
+   383→              <FormField
+   384→                control={form.control}
+   385→                name="asset"
+   386→                render={({ field }) => (
+   387→                  <FormItem>
+   388→                    <FormLabel>Activo</FormLabel>
+   389→                    <Select onValueChange={field.onChange} value={field.value}>
+   390→                      <FormControl>
+   391→                        <SelectTrigger>
+   392→                          <SelectValue />
+   393→                        </SelectTrigger>
+   394→                      </FormControl>
+   395→                      <SelectContent>
+   396→                        {ASSETS.map((a) => (
+   397→                          <SelectItem key={a} value={a}>
+   398→                            {a}
+   399→                          </SelectItem>
+   400→                        ))}
+   401→                      </SelectContent>
+   402→                    </Select>
+   403→                    <FormMessage />
+   404→                  </FormItem>
+   405→                )}
+   406→              />
+   407→
+   408→              <FormField
+   409→                control={form.control}
+   410→                name="currency"
+   411→                render={({ field }) => (
+   412→                  <FormItem>
+   413→                    <FormLabel>Moneda fiat</FormLabel>
+   414→                    <Select onValueChange={field.onChange} value={field.value}>
+   415→                      <FormControl>
+   416→                        <SelectTrigger>
+   417→                          <SelectValue />
+   418→                        </SelectTrigger>
+   419→                      </FormControl>
+   420→                      <SelectContent>
+   421→                        {CURRENCIES.map((c) => (
+   422→                          <SelectItem key={c} value={c}>
+   423→                            {c}
+   424→                          </SelectItem>
+   425→                        ))}
+   426→                      </SelectContent>
+   427→                    </Select>
+   428→                    <FormMessage />
+   429→                  </FormItem>
+   430→                )}
+   431→              />
+   432→
+   433→              <FormField
+   434→                control={form.control}
+   435→                name="amount"
+   436→                render={({ field }) => (
+   437→                  <FormItem>
+   438→                    <FormLabel>Cantidad de {watchedAsset || 'activo'} *</FormLabel>
+   439→                    <FormControl>
+   440→                      <Input
+   441→                        type="number"
+   442→                        step="0.000001"
+   443→                        placeholder="0.00"
+   444→                        {...field}
+   445→                      />
+   446→                    </FormControl>
+   447→                    <FormMessage />
+   448→                  </FormItem>
+   449→                )}
+   450→              />
+   451→
+   452→              <FormField
+   453→                control={form.control}
+   454→                name="rate"
+   455→                render={({ field }) => (
+   456→                  <FormItem>
+   457→                    <FormLabel>Tasa ({watchedCurrency}/{watchedAsset || '...'}) *</FormLabel>
+   458→                    <FormControl>
+   459→                      <Input
+   460→                        type="number"
+   461→                        step="0.000001"
+   462→                        placeholder="0.00"
+   463→                        {...field}
+   464→                      />
+   465→                    </FormControl>
+   466→                    <FormMessage />
+   467→                  </FormItem>
+   468→                )}
+   469→              />
+   470→
+   471→              {/* Total calculado */}
+   472→              <div className="sm:col-span-2 rounded-lg bg-muted p-3 flex items-center justify-between">
+   473→                <span className="text-sm text-muted-foreground">
+   474→                  Total bruto ({watchedCurrency})
+   475→                </span>
+   476→                <span className="font-semibold tabular-nums">
+   477→                  {formatCurrency(total, watchedCurrency)}
+   478→                </span>
+   479→              </div>
+   480→
+   481→              {/* Bancos */}
+   482→              {watchedType === 'compra' ? (
+   483→                <>
+   484→                  <FormField
+   485→                    control={form.control}
+   486→                    name="fromBankId"
+   487→                    render={({ field }) => (
+   488→                      <FormItem>
+   489→                        <FormLabel>Banco que paga (origen)</FormLabel>
+   490→                        <Select
+   491→                          onValueChange={(v) =>
+   492→                            field.onChange(v === '__none' ? null : v)
+   493→                          }
+   494→                          value={field.value ?? '__none'}
+   495→                        >
+   496→                          <FormControl>
+   497→                            <SelectTrigger>
+   498→                              <SelectValue placeholder="Sin banco" />
+   499→                            </SelectTrigger>
+   500→                          </FormControl>
+   501→                          <SelectContent>
+   502→                            <SelectItem value="__none">
+   503→                              Sin banco
+   504→                            </SelectItem>
+   505→                            {activeBanks.map((b) => (
+   506→                              <SelectItem key={b.id} value={b.id}>
+   507→                                {b.name} ({b.currency})
+   508→                              </SelectItem>
+   509→                            ))}
+   510→                          </SelectContent>
+   511→                        </Select>
+   512→                        <FormDescription>
+   513→                          Banco desde donde sale el dinero fiat.
+   514→                        </FormDescription>
+   515→                        <FormMessage />
+   516→                      </FormItem>
+   517→                    )}
+   518→                  />
+   519→                  <FormField
+   520→                    control={form.control}
+   521→                    name="toBankId"
+   522→                    render={({ field }) => (
+   523→                      <FormItem>
+   524→                        <FormLabel>Banco receptor (opcional)</FormLabel>
+   525→                        <Select
+   526→                          onValueChange={(v) =>
+   527→                            field.onChange(v === '__none' ? null : v)
+   528→                          }
+   529→                          value={field.value ?? '__none'}
+   530→                        >
+   531→                          <FormControl>
+   532→                            <SelectTrigger>
+   533→                              <SelectValue placeholder="Sin banco" />
+   534→                            </SelectTrigger>
+   535→                          </FormControl>
+   536→                          <SelectContent>
+   537→                            <SelectItem value="__none">
+   538→                              Sin banco
+   539→                            </SelectItem>
+   540→                            {activeBanks.map((b) => (
+   541→                              <SelectItem key={b.id} value={b.id}>
+   542→                                {b.name} ({b.currency})
+   543→                              </SelectItem>
+   544→                            ))}
+   545→                          </SelectContent>
+   546→                        </Select>
+   547→                        <FormDescription>
+   548→                          Donde recibes el activo (si aplica).
+   549→                        </FormDescription>
+   550→                        <FormMessage />
+   551→                      </FormItem>
+   552→                    )}
+   553→                  />
+   554→                </>
+   555→              ) : (
+   556→                <>
+   557→                  <FormField
+   558→                    control={form.control}
+   559→                    name="fromBankId"
+   560→                    render={({ field }) => (
+   561→                      <FormItem>
+   562→                        <FormLabel>Banco que envía activo (opcional)</FormLabel>
+   563→                        <Select
+   564→                          onValueChange={(v) =>
+   565→                            field.onChange(v === '__none' ? null : v)
+   566→                          }
+   567→                          value={field.value ?? '__none'}
+   568→                        >
+   569→                          <FormControl>
+   570→                            <SelectTrigger>
+   571→                              <SelectValue placeholder="Sin banco" />
+   572→                            </SelectTrigger>
+   573→                          </FormControl>
+   574→                          <SelectContent>
+   575→                            <SelectItem value="__none">
+   576→                              Sin banco
+   577→                            </SelectItem>
+   578→                            {activeBanks.map((b) => (
+   579→                              <SelectItem key={b.id} value={b.id}>
+   580→                                {b.name} ({b.currency})
+   581→                              </SelectItem>
+   582→                            ))}
+   583→                          </SelectContent>
+   584→                        </Select>
+   585→                        <FormDescription>
+   586→                          Banco desde donde sale el activo (si aplica).
+   587→                        </FormDescription>
+   588→                        <FormMessage />
+   589→                      </FormItem>
+   590→                    )}
+   591→                  />
+   592→                  <FormField
+   593→                    control={form.control}
+   594→                    name="toBankId"
+   595→                    render={({ field }) => (
+   596→                      <FormItem>
+   597→                        <FormLabel>Banco que recibe fiat</FormLabel>
+   598→                        <Select
+   599→                          onValueChange={(v) =>
+   600→                            field.onChange(v === '__none' ? null : v)
+   601→                          }
+   602→                          value={field.value ?? '__none'}
+   603→                        >
+   604→                          <FormControl>
+   605→                            <SelectTrigger>
+   606→                              <SelectValue placeholder="Sin banco" />
+   607→                            </SelectTrigger>
+   608→                          </FormControl>
+   609→                          <SelectContent>
+   610→                            <SelectItem value="__none">
+   611→                              Sin banco
+   612→                            </SelectItem>
+   613→                            {activeBanks.map((b) => (
+   614→                              <SelectItem key={b.id} value={b.id}>
+   615→                                {b.name} ({b.currency})
+   616→                              </SelectItem>
+   617→                            ))}
+   618→                          </SelectContent>
+   619→                        </Select>
+   620→                        <FormDescription>
+   621→                          Banco donde recibes el dinero fiat.
+   622→                        </FormDescription>
+   623→                        <FormMessage />
+   624→                      </FormItem>
+   625→                    )}
+   626→                  />
+   627→                </>
+   628→              )}
+   629→
+   630→              {/* Flujo visual */}
+   631→              {(form.watch('fromBankId') || form.watch('toBankId')) && (
+   632→                <div className="sm:col-span-2 flex items-center gap-2 text-xs text-muted-foreground rounded-lg border p-2">
+   633→                  <span className="font-medium text-foreground">
+   634→                    {activeBanks.find(
+   635→                      (b) => b.id === form.watch('fromBankId')
+   636→                    )?.name ?? '—'}
+   637→                  </span>
+   638→                  <ArrowRight className="h-3 w-3" />
+   639→                  <span>
+   640→                    {watchedType === 'compra'
+   641→                      ? `${formatNumber(Number(watchedAmount) || 0)} ${watchedAsset}`
+   642→                      : `${formatCurrency(total, watchedCurrency)}`}
+   643→                  </span>
+   644→                  <ArrowRight className="h-3 w-3" />
+   645→                  <span className="font-medium text-foreground">
+   646→                    {activeBanks.find(
+   647→                      (b) => b.id === form.watch('toBankId')
+   648→                    )?.name ?? '—'}
+   649→                  </span>
+   650→                </div>
+   651→              )}
+   652→
+   653→              <FormField
+   654→                control={form.control}
+   655→                name="status"
+   656→                render={({ field }) => (
+   657→                  <FormItem>
+   658→                    <FormLabel>Estado</FormLabel>
+   659→                    <Select onValueChange={field.onChange} value={field.value}>
+   660→                      <FormControl>
+   661→                        <SelectTrigger>
+   662→                          <SelectValue />
+   663→                        </SelectTrigger>
+   664→                      </FormControl>
+   665→                      <SelectContent>
+   666→                        <SelectItem value="completada">Completada</SelectItem>
+   667→                        <SelectItem value="pendiente">Pendiente</SelectItem>
+   668→                        <SelectItem value="cancelada">Cancelada</SelectItem>
+   669→                      </SelectContent>
+   670→                    </Select>
+   671→                    <FormMessage />
+   672→                  </FormItem>
+   673→                )}
+   674→              />
+   675→
+   676→              <FormField
+   677→                control={form.control}
+   678→                name="date"
+   679→                render={({ field }) => (
+   680→                  <FormItem>
+   681→                    <FormLabel>Fecha y hora</FormLabel>
+   682→                    <FormControl>
+   683→                      <Input type="datetime-local" {...field} />
+   684→                    </FormControl>
+   685→                    <FormMessage />
+   686→                  </FormItem>
+   687→                )}
+   688→              />
+   689→
+   690→              <FormField
+   691→                control={form.control}
+   692→                name="reference"
+   693→                render={({ field }) => (
+   694→                  <FormItem>
+   695→                    <FormLabel>Referencia</FormLabel>
+   696→                    <FormControl>
+   697→                      <Input
+   698→                        placeholder="N° de operación o ref"
+   699→                        {...field}
+   700→                      />
+   701→                    </FormControl>
+   702→                    <FormMessage />
+   703→                  </FormItem>
+   704→                )}
+   705→              />
+   706→
+   707→              {/* Comisión con toggle de bloqueo */}
+   708→              <FormField
+   709→                control={form.control}
+   710→                name="fee"
+   711→                render={({ field }) => (
+   712→                  <FormItem>
+   713→                    <FormLabel className="flex items-center justify-between">
+   714→                      <span>Comisión ({watchedCurrency})</span>
+   715→                      <button
+   716→                        type="button"
+   717→                        onClick={feeLocked ? unlockFee : lockFee}
+   718→                        className="text-xs flex items-center gap-1 px-2 py-0.5 rounded border hover:bg-muted"
+   719→                        title={feeLocked ? 'Desbloquear para recalcular automáticamente' : 'Bloquear valor manual'}
+   720→                      >
+   721→                        {feeLocked ? (
+   722→                          <>
+   723→                            <Lock className="h-3 w-3" /> Manual
+   724→                          </>
+   725→                        ) : (
+   726→                          <>
+   727→                            <Unlock className="h-3 w-3" /> Auto
+   728→                          </>
+   729→                        )}
+   730→                      </button>
+   731→                    </FormLabel>
+   732→                    <FormControl>
+   733→                      <Input
+   734→                        type="number"
+   735→                        step="0.01"
+   736→                        placeholder="0.00"
+   737→                        {...field}
+   738→                      />
+   739→                    </FormControl>
+   740→                    <FormDescription>
+   741→                      {watchedExchangeId && watchedExchangeId !== '__none'
+   742→                        ? `Calculada automáticamente según el exchange. ${feeLocked ? 'Bloqueada manualmente.' : 'Se recalcula al cambiar monto/tasa.'}`
+   743→                        : 'Ingresa la comisión manualmente o selecciona un exchange para calcularla.'}
+   744→                    </FormDescription>
+   745→                    <FormMessage />
+   746→                  </FormItem>
+   747→                )}
+   748→              />
+   749→            </div>
+   750→
+   751→            {/* Resumen neto */}
+   752→            <div className="rounded-lg border-2 border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-3 space-y-1.5">
+   753→              <div className="flex items-center justify-between text-sm">
+   754→                <span className="text-muted-foreground">Total bruto</span>
+   755→                <span className="tabular-nums">{formatCurrency(total, watchedCurrency)}</span>
+   756→              </div>
+   757→              <div className="flex items-center justify-between text-sm">
+   758→                <span className="text-amber-600 dark:text-amber-400">− Comisión</span>
+   759→                <span className="tabular-nums text-amber-600 dark:text-amber-400">
+   760→                  {formatCurrency(fee, watchedCurrency)}
+   761→                </span>
+   762→              </div>
+   763→              {/* Detalle de comisión cuando hay exchange seleccionado */}
+   764→              {(() => {
+   765→                if (!watchedExchangeId || watchedExchangeId === '__none') return null
+   766→                const ex = exchanges.find((e) => e.id === watchedExchangeId)
+   767→                if (!ex) return null
+   768→                const calc = storage.calculateFee(ex, watchedType, total)
+   769→                const tiers = watchedType === 'compra' ? ex.buyTiers : ex.sellTiers
+   770→                const applicableTier = tiers && tiers.length > 0
+   771→                  ? [...tiers].sort((a, b) => b.minAmount - a.minAmount).find((t) => total >= t.minAmount)
+   772→                  : null
+   773→                return (
+   774→                  <div className="text-[11px] text-muted-foreground pl-2 border-l-2 border-amber-200 dark:border-amber-900 space-y-0.5">
+   775→                    {applicableTier ? (
+   776→                      <p>
+   777→                        Tier aplicado: ≥ {formatNumber(applicableTier.minAmount, 0)} →{' '}
+   778→                        {formatNumber(applicableTier.feeValue, 4)}
+   779→                        {applicableTier.feeType === 'percent' ? '%' : ` ${watchedCurrency}`}
+   780→                      </p>
+   781→                    ) : (
+   782→                      <p>
+   783→                        Comisión base:{' '}
+   784→                        {(watchedType === 'compra' ? ex.buyFeeType : ex.sellFeeType) === 'percent'
+   785→                          ? `${formatNumber(watchedType === 'compra' ? ex.buyFeeValue : ex.sellFeeValue, 4)}%`
+   786→                          : `${formatNumber(watchedType === 'compra' ? ex.buyFeeValue : ex.sellFeeValue, 4)} ${watchedCurrency}`}
+   787→                      </p>
+   788→                    )}
+   789→                    {calc.discount > 0 && (
+   790→                      <p className="text-violet-600 dark:text-violet-400">
+   791→                        −{formatCurrency(calc.discount, watchedCurrency)} ({ex.discountLabel ?? `${ex.discountPercent}% off`})
+   792→                      </p>
+   793→                    )}
+   794→                    {calc.fixedFee > 0 && (
+   795→                      <p>
+   796→                        +{formatCurrency(calc.fixedFee, watchedCurrency)} fija ({ex.fixedFeeCurrency})
+   797→                      </p>
+   798→                    )}
+   799→                  </div>
+   800→                )
+   801→              })()}
+   802→              <div className="flex items-center justify-between text-sm pt-1.5 border-t border-emerald-200 dark:border-emerald-900">
+   803→                <span className="font-medium">Total neto</span>
+   804→                <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+   805→                  {formatCurrency(netTotal, watchedCurrency)}
+   806→                </span>
+   807→              </div>
+   808→            </div>
+   809→
+   810→            <FormField
+   811→              control={form.control}
+   812→              name="notes"
+   813→              render={({ field }) => (
+   814→                <FormItem>
+   815→                  <FormLabel>Notas</FormLabel>
+   816→                  <FormControl>
+   817→                    <Textarea
+   818→                      placeholder="Detalles adicionales..."
+   819→                      rows={2}
+   820→                      {...field}
+   821→                    />
+   822→                  </FormControl>
+   823→                  <FormMessage />
+   824→                </FormItem>
+   825→              )}
+   826→            />
+   827→
+   828→            <DialogFooter>
+   829→              <Button
+   830→                type="button"
+   831→                variant="outline"
+   832→                onClick={() => onOpenChange(false)}
+   833→                disabled={submitting}
+   834→              >
+   835→                Cancelar
+   836→              </Button>
+   837→              <Button type="submit" disabled={submitting}>
+   838→                {submitting && (
+   839→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   840→                )}
+   841→                {transaction
+   842→                  ? 'Guardar cambios'
+   843→                  : watchedType === 'compra'
+   844→                    ? 'Registrar compra'
+   845→                    : 'Registrar venta'}
+   846→              </Button>
+   847→            </DialogFooter>
+   848→          </form>
+   849→        </Form>
+   850→      </DialogContent>
+   851→    </Dialog>
+   852→  )
+   853→}
+   854→

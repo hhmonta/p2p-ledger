@@ -261,7 +261,7 @@ export function ExchangeForm({
                     <FormLabel>Nombre del exchange *</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Ej: Binance P2P, OKX, Mercado Libre..."
+                        placeholder="Ej: Binance P2P, OKX, P2p.me, Mercado Libre..."
                         {...field}
                       />
                     </FormControl>

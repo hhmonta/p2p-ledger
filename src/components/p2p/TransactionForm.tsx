@@ -49,7 +49,7 @@ const txSchema = z.object({
   counterparty: z.string().min(1, 'La contraparte es obligatoria'),
   asset: z.string().min(1, 'El activo es obligatorio'),
   amount: z.coerce.number().positive('Debe ser > 0'),
-  rate: z.coerce.number().positive('Debe ser > 0'),
+  rate: z.coerce.number().min(0, 'Debe ser ≥ 0'),
   currency: z.string().min(1),
   fromBankId: z.string().optional().nullable(),
   toBankId: z.string().optional().nullable(),
@@ -86,6 +86,8 @@ export function TransactionForm({
   const [submitting, setSubmitting] = useState(false)
   const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [feeLocked, setFeeLocked] = useState(false) // si true, el fee NO se recalcula al cambiar inputs
+  const [rateLocked, setRateLocked] = useState(false) // si true, la tasa NO se recalcula desde total
+  const [totalInput, setTotalInput] = useState<string>('') // total bruto ingresado por el usuario
 
   const activeBanks = useMemo(() => banks.filter((b) => b.isActive), [banks])
   const activeExchanges = useMemo(() => exchanges.filter((e) => e.isActive), [exchanges])
@@ -166,7 +168,33 @@ export function TransactionForm({
   const watchedExchangeId = form.watch('exchangeId')
   const watchedFee = form.watch('fee')
 
-  const total = (Number(watchedAmount) || 0) * (Number(watchedRate) || 0)
+  // Total bruto: si el usuario lo ingresó manualmente, usar ese valor;
+  // si no, calcularlo desde amount * rate
+  const totalFromRate = (Number(watchedAmount) || 0) * (Number(watchedRate) || 0)
+  const total = totalInput !== '' ? Number(totalInput) : totalFromRate
+
+  // Calcular tasa automáticamente cuando cambia el total ingresado o el monto
+  useEffect(() => {
+    if (rateLocked) return
+    const amount = Number(watchedAmount) || 0
+    const totalVal = Number(totalInput) || 0
+    if (amount > 0 && totalVal > 0) {
+      const calculatedRate = totalVal / amount
+      form.setValue('rate', Number(calculatedRate.toFixed(6)))
+    }
+  }, [totalInput, watchedAmount, rateLocked, form])
+
+  // Al resetear el form, sincronizar totalInput
+  useEffect(() => {
+    if (open && transaction) {
+      const t = (Number(transaction.amount) || 0) * (Number(transaction.rate) || 0)
+      setTotalInput(t > 0 ? String(t) : '')
+      setRateLocked(true) // al editar, la tasa es manual
+    } else if (open && !transaction) {
+      setTotalInput('')
+      setRateLocked(false)
+    }
+  }, [open, transaction])
 
   // Cálculo automático de comisión cuando cambia exchange, monto, tasa o tipo
   // (solo si el fee NO está bloqueado manualmente)
@@ -180,9 +208,8 @@ export function TransactionForm({
     if (!ex) return
     const calc = storage.calculateFee(ex, watchedType, total)
     form.setValue('fee', Number(calc.total.toFixed(6)))
-  }, [watchedExchangeId, watchedAmount, watchedRate, watchedType, exchanges, total, feeLocked, form])
+  }, [watchedExchangeId, watchedAmount, watchedRate, watchedType, exchanges, total, feeLocked, form, totalInput])
 
-  // Al cambiar de exchange manualmente, desbloquear fee para recalcular
   function handleExchangeChange(v: string) {
     const value = v === '__none' ? null : v
     form.setValue('exchangeId', value)
@@ -195,6 +222,27 @@ export function TransactionForm({
 
   function lockFee() {
     setFeeLocked(true)
+  }
+
+  function unlockRate() {
+    setRateLocked(false)
+  }
+
+  function lockRate() {
+    setRateLocked(true)
+  }
+
+  // Manejar cambio en total bruto ingresado
+  function handleTotalInputChange(value: string) {
+    setTotalInput(value)
+    // Si el usuario está escribiendo el total, desbloquear la tasa para que se calcule
+    if (!rateLocked && value !== '') {
+      const amount = Number(watchedAmount) || 0
+      const totalVal = Number(value) || 0
+      if (amount > 0 && totalVal > 0) {
+        form.setValue('rate', Number((totalVal / amount).toFixed(6)))
+      }
+    }
   }
 
   async function onSubmit(values: FormValues) {
@@ -449,34 +497,67 @@ export function TransactionForm({
                 )}
               />
 
+              {/* Total bruto (input) — la tasa se calcula automáticamente */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center justify-between">
+                  <span>Total bruto ({watchedCurrency}) *</span>
+                  <button
+                    type="button"
+                    onClick={rateLocked ? unlockRate : lockRate}
+                    className="text-xs flex items-center gap-1 px-2 py-0.5 rounded border hover:bg-muted"
+                    title={rateLocked ? 'Desbloquear para calcular tasa automáticamente' : 'Tasa se calcula desde el total'}
+                  >
+                    {rateLocked ? (
+                      <>
+                        <Lock className="h-3 w-3" /> Tasa manual
+                      </>
+                    ) : (
+                      <>
+                        <Unlock className="h-3 w-3" /> Tasa auto
+                      </>
+                    )}
+                  </button>
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={totalInput}
+                  onChange={(e) => handleTotalInputChange(e.target.value)}
+                />
+                <p className="text-[0.8rem] text-muted-foreground">
+                  {rateLocked
+                    ? 'La tasa no se recalculará automáticamente.'
+                    : 'Ingresa el total bruto y la tasa se calculará automáticamente.'}
+                </p>
+              </div>
+
+              {/* Tasa calculada (solo lectura o editable si está bloqueada) */}
               <FormField
                 control={form.control}
                 name="rate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tasa ({watchedCurrency}/{watchedAsset || '...'}) *</FormLabel>
+                    <FormLabel>Tasa ({watchedCurrency}/{watchedAsset || '...'})</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.000001"
                         placeholder="0.00"
+                        className={rateLocked ? '' : 'bg-muted/50 cursor-default'}
+                        readOnly={!rateLocked}
                         {...field}
                       />
                     </FormControl>
+                    <FormDescription>
+                      {rateLocked
+                        ? 'Edita la tasa manualmente.'
+                        : `Calculada: ${formatNumber(Number(watchedRate) || 0, 6)} ${watchedCurrency}/${watchedAsset}`}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {/* Total calculado */}
-              <div className="sm:col-span-2 rounded-lg bg-muted p-3 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Total bruto ({watchedCurrency})
-                </span>
-                <span className="font-semibold tabular-nums">
-                  {formatCurrency(total, watchedCurrency)}
-                </span>
-              </div>
 
               {/* Bancos */}
               {watchedType === 'compra' ? (
