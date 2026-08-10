@@ -69,6 +69,11 @@ export function ProfitCalculator() {
     const spreadPercent = bRate > 0 ? (spread / bRate) * 100 : 0
     const roi = buyTotal > 0 ? (netProfit / buyTotal) * 100 : 0
 
+    // Ganancia neta en USD (convertir la ganancia fiat a su equivalente en USD usando la tasa de compra promedio)
+    const avgRate = (bRate + sRate) / 2
+    const netProfitUSD = avgRate > 0 ? netProfit / avgRate : 0
+    const grossProfitUSD = avgRate > 0 ? grossProfit / avgRate : 0
+
     return {
       buyTotal,
       sellTotal,
@@ -77,6 +82,8 @@ export function ProfitCalculator() {
       totalFees,
       grossProfit,
       netProfit,
+      grossProfitUSD,
+      netProfitUSD,
       spread,
       spreadPercent,
       roi,
@@ -258,7 +265,7 @@ export function ProfitCalculator() {
       </Card>
 
       {/* Resultados */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 sm:gap-3">
         <Card className="p-0">
           <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
             <CardDescription className="text-[9px] sm:text-xs">Spread</CardDescription>
@@ -291,6 +298,17 @@ export function ProfitCalculator() {
             <CardDescription className="text-[9px] sm:text-xs">Ganancia neta</CardDescription>
             <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${profitColor}`}>
               {formatCurrency(calc.netProfit, currency)}
+            </CardTitle>
+            <p className="text-[9px] sm:text-xs text-muted-foreground">
+              ≈ {formatCurrency(calc.netProfitUSD, 'USD')} USD
+            </p>
+          </CardHeader>
+        </Card>
+        <Card className="p-0">
+          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+            <CardDescription className="text-[9px] sm:text-xs">Ganancia neta (USD)</CardDescription>
+            <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${profitColor}`}>
+              {formatCurrency(calc.netProfitUSD, 'USD')}
             </CardTitle>
             <p className="text-[9px] sm:text-xs text-muted-foreground">
               ROI: {formatNumber(calc.roi, 2)}%
@@ -366,9 +384,15 @@ export function ProfitCalculator() {
             {/* Resultado final */}
             <div className="rounded-lg border-2 border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 p-2.5 sm:p-3">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Ganancia neta</span>
+                <span className="font-medium">Ganancia neta ({currency})</span>
                 <span className={`font-bold tabular-nums text-base sm:text-lg ${profitColor}`}>
                   {formatCurrency(calc.netProfit, currency)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span className="font-medium">Ganancia neta (USD)</span>
+                <span className={`font-bold tabular-nums text-base sm:text-lg ${profitColor}`}>
+                  {formatCurrency(calc.netProfitUSD, 'USD')}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-1 text-muted-foreground">
@@ -400,7 +424,8 @@ export function ProfitCalculator() {
                     <th className="py-1.5 pr-3 text-right font-medium text-muted-foreground">Inversión</th>
                     <th className="py-1.5 pr-3 text-right font-medium text-muted-foreground">Retorno</th>
                     <th className="py-1.5 pr-3 text-right font-medium text-muted-foreground">Fees</th>
-                    <th className="py-1.5 text-right font-medium text-muted-foreground">Ganancia</th>
+                    <th className="py-1.5 pr-3 text-right font-medium text-muted-foreground">Ganancia ({currency})</th>
+                    <th className="py-1.5 text-right font-medium text-muted-foreground">Ganancia (USD)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -411,6 +436,8 @@ export function ProfitCalculator() {
                     const sFeeAmt = sTotal * ((Number(sellFeePercent) || 0) / 100)
                     const fees = bFeeAmt + sFeeAmt + (Number(fixedFee) || 0)
                     const profit = (sTotal - bTotal) - fees
+                    const avgR = ((Number(buyRate) || 0) + (Number(sellRate) || 0)) / 2
+                    const profitUSD = avgR > 0 ? profit / avgR : 0
                     const pColor = profit > 0
                       ? 'text-emerald-600 dark:text-emerald-400'
                       : profit < 0
@@ -422,7 +449,8 @@ export function ProfitCalculator() {
                         <td className="py-1.5 pr-3 text-right tabular-nums">{formatCurrency(bTotal, currency)}</td>
                         <td className="py-1.5 pr-3 text-right tabular-nums">{formatCurrency(sTotal, currency)}</td>
                         <td className="py-1.5 pr-3 text-right tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(fees, currency)}</td>
-                        <td className={`py-1.5 text-right tabular-nums font-medium ${pColor}`}>{formatCurrency(profit, currency)}</td>
+                        <td className={`py-1.5 pr-3 text-right tabular-nums font-medium ${pColor}`}>{formatCurrency(profit, currency)}</td>
+                        <td className={`py-1.5 text-right tabular-nums font-medium ${pColor}`}>{formatCurrency(profitUSD, 'USD')}</td>
                       </tr>
                     )
                   })}
