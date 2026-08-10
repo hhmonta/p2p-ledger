@@ -61,6 +61,7 @@ server.log
 # Download / build artifacts
 /download/
 /upload/
+*.apk
 
 # Internal scaffolding
 /.zscripts/
@@ -71,9 +72,12 @@ server.log
 # Android tools (descargados localmente, no se commitean)
 /.android-tools/
 /sdk/
+/.jdk/
+/.android-sdk/
 
 # Build output
 /out/
+/public/downloads/
 
 # Android project ( Capacitor ) - kept, except build artifacts
 /android/app/build/
