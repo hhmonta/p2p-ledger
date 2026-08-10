@@ -37,6 +37,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Plus,
   Pencil,
   Trash2,
@@ -53,6 +59,8 @@ import {
   Image as ImageIcon,
   Download,
   FileText,
+  FileSpreadsheet,
+  ChevronDown,
 } from 'lucide-react'
 import type {
   Bank,
@@ -93,7 +101,7 @@ function exportCSV(transactions: Transaction[], filename: string) {
   const headers = ['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total Bruto', 'Moneda', 'Comisión', 'Total Neto', 'Exchange', 'Banco Origen', 'Banco Destino', 'Referencia', 'Estado', 'Notas']
   const rows = transactions.map((t) => [
     t.type === 'compra' ? 'Compra' : 'Venta',
-    formatDate(t.date, true),
+    formatDate(t.date),
     t.counterparty,
     t.asset,
     t.amount.toString(),
@@ -119,41 +127,118 @@ function exportCSV(transactions: Transaction[], filename: string) {
   a.download = `${filename}.csv`
   a.click()
   URL.revokeObjectURL(url)
-  toast({ title: 'CSV exportado', description: `${transactions.length} transacciones exportadas.` })
+  toast({ title: 'CSV exportado', description: `${transactions.length} transacciones exportadas a CSV.` })
 }
 
-// Exportar transacciones a PDF (formato simple con texto)
-function exportPDF(transactions: Transaction[], filename: string) {
-  // Generar un PDF simple usando jsPDF-like approach con canvas
-  const lines: string[] = []
-  lines.push('P2P Ledger - Reporte de Transacciones')
-  lines.push(`Generado: ${formatDate(new Date(), true)}`)
-  lines.push(`Total: ${transactions.length} operaciones`)
-  lines.push('─'.repeat(80))
-  lines.push('')
+// Exportar transacciones a PDF profesional con jsPDF
+async function exportPDF(transactions: Transaction[], filename: string) {
+  try {
+    const { jsPDF } = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
 
-  for (const t of transactions) {
-    const tipo = t.type === 'compra' ? 'COMPRA' : 'VENTA'
-    lines.push(`[${tipo}] ${formatDate(t.date, true)} | ${t.counterparty}`)
-    lines.push(`  ${formatNumber(t.amount, 2)} ${t.asset} @ ${formatNumber(t.rate, 2)} = ${formatCurrency(t.total, t.currency)}`)
-    if (t.fee > 0) {
-      lines.push(`  Comisión: ${formatCurrency(t.fee, t.currency)} | Neto: ${formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}`)
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+
+    // Título
+    doc.setFontSize(18)
+    doc.setTextColor(30, 41, 59)
+    doc.text('P2P Ledger - Reporte de Transacciones', 14, 18)
+
+    // Subtítulo
+    doc.setFontSize(10)
+    doc.setTextColor(100, 116, 139)
+    doc.text(`Generado: ${formatDate(new Date(), true)}`, 14, 25)
+    doc.text(`Total: ${transactions.length} operaciones`, 14, 30)
+
+    // Resumen financiero
+    const compras = transactions.filter((t) => t.type === 'compra')
+    const ventas = transactions.filter((t) => t.type === 'venta')
+    const totalCompras = compras.reduce((s, t) => s + t.total, 0)
+    const totalVentas = ventas.reduce((s, t) => s + t.total, 0)
+    const totalComisiones = transactions.reduce((s, t) => s + t.fee, 0)
+
+    doc.setFontSize(9)
+    doc.setTextColor(30, 41, 59)
+    const summaryY = 36
+    doc.text(`Compras: ${compras.length} ops | Total: ${formatCurrency(totalCompras, transactions[0]?.currency ?? 'VES')}`, 14, summaryY)
+    doc.text(`Ventas: ${ventas.length} ops | Total: ${formatCurrency(totalVentas, transactions[0]?.currency ?? 'VES')}`, 14, summaryY + 5)
+    doc.text(`Comisiones totales: ${formatCurrency(totalComisiones, transactions[0]?.currency ?? 'VES')}`, 14, summaryY + 10)
+
+    // Tabla de transacciones
+    const tableHeaders = [['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total', 'Comisión', 'Neto', 'Exchange', 'Estado']]
+    const tableRows = transactions.map((t) => [
+      t.type === 'compra' ? 'Compra' : 'Venta',
+      formatDate(t.date),
+      t.counterparty,
+      t.asset,
+      formatNumber(t.amount, 2),
+      formatNumber(t.rate, 2),
+      formatCurrency(t.total, t.currency),
+      formatCurrency(t.fee, t.currency),
+      formatCurrency(t.netTotal ?? t.total - t.fee, t.currency),
+      t.exchange?.shortName ?? t.exchange?.name ?? '-',
+      STATUS_LABELS[t.status],
+    ])
+
+    autoTable(doc, {
+      head: tableHeaders,
+      body: tableRows,
+      startY: summaryY + 16,
+      theme: 'grid',
+      styles: {
+        fontSize: 7,
+        cellPadding: 2,
+        textColor: [30, 41, 59],
+        lineWidth: 0.1,
+        lineColor: [203, 213, 225],
+      },
+      headStyles: {
+        fillColor: [99, 102, 241],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 7.5,
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      columnStyles: {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 24 },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+        7: { halign: 'right' },
+        8: { halign: 'right' },
+      },
+      didParseCell: (data) => {
+        // Colorear tipo de transacción
+        if (data.column.index === 0 && data.section === 'body') {
+          const val = data.cell.raw as string
+          if (val === 'Compra') {
+            data.cell.styles.textColor = [16, 185, 129]
+            data.cell.styles.fontStyle = 'bold'
+          } else if (val === 'Venta') {
+            data.cell.styles.textColor = [244, 63, 94]
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
+      },
+    })
+
+    // Pie de página
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(148, 163, 184)
+      doc.text(`P2P Ledger v1.0 - Página ${i} de ${pageCount}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' })
     }
-    if (t.exchange) lines.push(`  Exchange: ${t.exchange.name}`)
-    if (t.reference) lines.push(`  Ref: ${t.reference}`)
-    lines.push(`  Estado: ${STATUS_LABELS[t.status]}`)
-    lines.push('')
-  }
 
-  const textContent = lines.join('\n')
-  const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${filename}.txt`
-  a.click()
-  URL.revokeObjectURL(url)
-  toast({ title: 'Reporte exportado', description: `${transactions.length} transacciones exportadas como texto.` })
+    doc.save(`${filename}.pdf`)
+    toast({ title: 'PDF exportado', description: `${transactions.length} transacciones exportadas a PDF.` })
+  } catch (error) {
+    console.error('Error generando PDF:', error)
+    toast({ title: 'Error al exportar PDF', description: 'No se pudo generar el archivo PDF.', variant: 'destructive' })
+  }
 }
 
 // Sub-componente: card mobile para una transacción
@@ -666,26 +751,35 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
           {mode === 'venta' ? 'Nueva venta' : 'Nueva compra'}
         </Button>
         {filtered.length > 0 && (
-          <div className="flex gap-1.5 self-start">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportCSV(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
-              title="Exportar CSV"
-            >
-              <Download className="mr-1 h-3.5 w-3.5" />
-              CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportPDF(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
-              title="Exportar reporte de texto"
-            >
-              <FileText className="mr-1 h-3.5 w-3.5" />
-              Reporte
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="self-start">
+                <Download className="mr-1 h-3.5 w-3.5" />
+                Exportar
+                <ChevronDown className="ml-1 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => exportCSV(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                <div>
+                  <div className="font-medium">Exportar CSV</div>
+                  <div className="text-xs text-muted-foreground">Datos en formato tabla para Excel</div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => exportPDF(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
+              >
+                <FileText className="mr-2 h-4 w-4 text-indigo-600" />
+                <div>
+                  <div className="font-medium">Exportar PDF</div>
+                  <div className="text-xs text-muted-foreground">Reporte profesional con resumen</div>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
