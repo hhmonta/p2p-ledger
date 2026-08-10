@@ -96,8 +96,47 @@ function formatMonthLabel(monthKey: string): string {
   return `${monthNames[parseInt(month) - 1]} ${year}`
 }
 
+// Helper: guardar archivo preguntando al usuario dónde guardar (o descarga automática como fallback)
+async function saveFile(blob: Blob, defaultName: string, description: string): Promise<boolean> {
+  // Intentar usar showSaveFilePicker (Chrome, Edge, Opera desktop)
+  if ('showSaveFilePicker' in window) {
+    try {
+      const ext = defaultName.split('.').pop() ?? 'txt'
+      const mimeMap: Record<string, string> = {
+        csv: 'text/csv',
+        pdf: 'application/pdf',
+      }
+      const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
+        suggestedName: defaultName,
+        types: [{
+          description: description,
+          accept: { [mimeMap[ext] ?? 'application/octet-stream']: [`.${ext}`] },
+        }],
+      })
+      const writable = await handle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return true
+    } catch (err) {
+      // Usuario canceló el diálogo
+      if (err instanceof Error && err.name === 'AbortError') return false
+      // Otro error: fallback a descarga automática
+    }
+  }
+  // Fallback: descarga automática (Android WebView, Firefox, Safari)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = defaultName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  return true
+}
+
 // Exportar transacciones a CSV
-function exportCSV(transactions: Transaction[], filename: string) {
+async function exportCSV(transactions: Transaction[], filename: string) {
   const headers = ['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total Bruto', 'Moneda', 'Comisión', 'Total Neto', 'Exchange', 'Banco Origen', 'Banco Destino', 'Referencia', 'Estado', 'Notas']
   const rows = transactions.map((t) => [
     t.type === 'compra' ? 'Compra' : 'Venta',
@@ -121,13 +160,10 @@ function exportCSV(transactions: Transaction[], filename: string) {
     .map((row) => row.map((cell) => `"${cell}"`).join(','))
     .join('\n')
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${filename}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-  toast({ title: 'CSV exportado', description: `${transactions.length} transacciones exportadas a CSV.` })
+  const saved = await saveFile(blob, `${filename}.csv`, 'Archivo CSV')
+  if (saved) {
+    toast({ title: 'CSV exportado', description: `${transactions.length} transacciones exportadas a CSV.` })
+  }
 }
 
 // Exportar transacciones a PDF profesional con jsPDF
@@ -233,8 +269,12 @@ async function exportPDF(transactions: Transaction[], filename: string) {
       doc.text(`P2P Ledger v1.0 - Página ${i} de ${pageCount}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' })
     }
 
-    doc.save(`${filename}.pdf`)
-    toast({ title: 'PDF exportado', description: `${transactions.length} transacciones exportadas a PDF.` })
+    // Generar blob del PDF y guardar preguntando dónde
+    const pdfBlob = doc.output('blob')
+    const saved = await saveFile(pdfBlob, `${filename}.pdf`, 'Archivo PDF')
+    if (saved) {
+      toast({ title: 'PDF exportado', description: `${transactions.length} transacciones exportadas a PDF.` })
+    }
   } catch (error) {
     console.error('Error generando PDF:', error)
     toast({ title: 'Error al exportar PDF', description: 'No se pudo generar el archivo PDF.', variant: 'destructive' })
