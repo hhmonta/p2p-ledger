@@ -785,6 +785,9 @@ function migrateTx(t: Transaction): Transaction {
   if (t.exchangeId === undefined) {
     t.exchangeId = null
   }
+  if (t.captureUrl === undefined) {
+    t.captureUrl = null
+  }
   return t
 }
 
@@ -922,6 +925,7 @@ export async function createTransaction(input: TransactionInput): Promise<Transa
     fee,
     feeBreakdown,
     netTotal: total - fee,
+    captureUrl: input.captureUrl ?? null,
     date: input.date ?? now,
     notes: input.notes ?? null,
     createdAt: now,
@@ -1002,6 +1006,7 @@ export async function updateTransaction(
     fee,
     feeBreakdown,
     netTotal: total - fee,
+    captureUrl: input.captureUrl !== undefined ? input.captureUrl ?? null : existing.captureUrl,
     date: input.date ?? existing.date,
     notes: input.notes !== undefined ? input.notes ?? null : existing.notes,
     updatedAt: new Date().toISOString(),

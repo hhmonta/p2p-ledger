@@ -50,6 +50,9 @@ import {
   Calendar,
   TrendingUp,
   TrendingDown,
+  Image as ImageIcon,
+  Download,
+  FileText,
 } from 'lucide-react'
 import type {
   Bank,
@@ -83,6 +86,74 @@ function formatMonthLabel(monthKey: string): string {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ]
   return `${monthNames[parseInt(month) - 1]} ${year}`
+}
+
+// Exportar transacciones a CSV
+function exportCSV(transactions: Transaction[], filename: string) {
+  const headers = ['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total Bruto', 'Moneda', 'Comisión', 'Total Neto', 'Exchange', 'Banco Origen', 'Banco Destino', 'Referencia', 'Estado', 'Notas']
+  const rows = transactions.map((t) => [
+    t.type === 'compra' ? 'Compra' : 'Venta',
+    formatDate(t.date, true),
+    t.counterparty,
+    t.asset,
+    t.amount.toString(),
+    t.rate.toString(),
+    t.total.toString(),
+    t.currency,
+    t.fee.toString(),
+    (t.netTotal ?? t.total - t.fee).toString(),
+    t.exchange?.name ?? '',
+    t.fromBank?.name ?? '',
+    t.toBank?.name ?? '',
+    t.reference ?? '',
+    STATUS_LABELS[t.status],
+    (t.notes ?? '').replace(/"/g, '""'),
+  ])
+  const csvContent = [headers, ...rows]
+    .map((row) => row.map((cell) => `"${cell}"`).join(','))
+    .join('\n')
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast({ title: 'CSV exportado', description: `${transactions.length} transacciones exportadas.` })
+}
+
+// Exportar transacciones a PDF (formato simple con texto)
+function exportPDF(transactions: Transaction[], filename: string) {
+  // Generar un PDF simple usando jsPDF-like approach con canvas
+  const lines: string[] = []
+  lines.push('P2P Ledger - Reporte de Transacciones')
+  lines.push(`Generado: ${formatDate(new Date(), true)}`)
+  lines.push(`Total: ${transactions.length} operaciones`)
+  lines.push('─'.repeat(80))
+  lines.push('')
+
+  for (const t of transactions) {
+    const tipo = t.type === 'compra' ? 'COMPRA' : 'VENTA'
+    lines.push(`[${tipo}] ${formatDate(t.date, true)} | ${t.counterparty}`)
+    lines.push(`  ${formatNumber(t.amount, 2)} ${t.asset} @ ${formatNumber(t.rate, 2)} = ${formatCurrency(t.total, t.currency)}`)
+    if (t.fee > 0) {
+      lines.push(`  Comisión: ${formatCurrency(t.fee, t.currency)} | Neto: ${formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}`)
+    }
+    if (t.exchange) lines.push(`  Exchange: ${t.exchange.name}`)
+    if (t.reference) lines.push(`  Ref: ${t.reference}`)
+    lines.push(`  Estado: ${STATUS_LABELS[t.status]}`)
+    lines.push('')
+  }
+
+  const textContent = lines.join('\n')
+  const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast({ title: 'Reporte exportado', description: `${transactions.length} transacciones exportadas como texto.` })
 }
 
 // Sub-componente: card mobile para una transacción
@@ -137,6 +208,15 @@ function TransactionCardMobile({
       </div>
       {t.reference && (
         <p className="text-[10px] text-muted-foreground font-mono truncate">Ref: {t.reference}</p>
+      )}
+      {t.captureUrl && (
+        <div className="mt-1">
+          <img
+            src={t.captureUrl}
+            alt="Comprobante"
+            className="h-16 w-auto rounded border object-cover"
+          />
+        </div>
       )}
       <div className="flex items-center justify-between text-xs">
         <span className="tabular-nums">
@@ -290,6 +370,11 @@ function TransactionRowDesktop({
                 {t.toBank.name}
               </span>
             </>
+          )}
+          {t.captureUrl && (
+            <span className="text-blue-500" title="Tiene comprobante adjunto">
+              <ImageIcon className="h-3.5 w-3.5" />
+            </span>
           )}
         </div>
       </TableCell>
@@ -580,6 +665,28 @@ export function TransactionsView({ mode }: TransactionsViewProps) {
           <Plus className="mr-1 h-4 w-4" />
           {mode === 'venta' ? 'Nueva venta' : 'Nueva compra'}
         </Button>
+        {filtered.length > 0 && (
+          <div className="flex gap-1.5 self-start">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportCSV(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
+              title="Exportar CSV"
+            >
+              <Download className="mr-1 h-3.5 w-3.5" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportPDF(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
+              title="Exportar reporte de texto"
+            >
+              <FileText className="mr-1 h-3.5 w-3.5" />
+              Reporte
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filtros */}

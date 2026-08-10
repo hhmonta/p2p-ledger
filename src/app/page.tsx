@@ -7,7 +7,8 @@ import { Dashboard } from '@/components/p2p/Dashboard'
 import { BanksView } from '@/components/p2p/BanksView'
 import { ExchangesView } from '@/components/p2p/ExchangesView'
 import { TransactionsView } from '@/components/p2p/TransactionsView'
-import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered, Building2, Shield, Download } from 'lucide-react'
+import { ProfitCalculator } from '@/components/p2p/ProfitCalculator'
+import { Wallet, LayoutDashboard, Landmark, ShoppingCart, Tag, ListOrdered, Building2, Shield, Download, Calculator } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AuthProvider, useAuth } from '@/lib/auth-context'
 import { LockScreen } from '@/components/LockScreen'
@@ -141,7 +142,7 @@ function AppContent() {
       <main className="container mx-auto px-2 py-2 sm:px-4 sm:py-6 flex-1 w-full">
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <div className="overflow-x-auto -mx-2 px-2 pb-1 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
-            <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-3 sm:grid-cols-6 mb-2 sm:mb-6 h-auto gap-1">
+            <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 sm:grid-cols-7 mb-2 sm:mb-6 h-auto gap-1">
               <TabsTrigger value="dashboard" className="flex items-center gap-1 py-1.5 sm:py-2 text-[11px] sm:text-sm px-2 sm:px-3">
                 <LayoutDashboard className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -164,7 +165,12 @@ function AppContent() {
                 <Tag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 Ventas
               </TabsTrigger>
-              <TabsTrigger value="todas" className="flex items-center gap-1 py-1.5 sm:py-2 text-[11px] sm:text-sm px-2 sm:px-3 col-span-3 sm:col-span-1">
+              <TabsTrigger value="calculadora" className="flex items-center gap-1 py-1.5 sm:py-2 text-[11px] sm:text-sm px-2 sm:px-3">
+                <Calculator className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline">Calculadora</span>
+                <span className="sm:hidden">Calc.</span>
+              </TabsTrigger>
+              <TabsTrigger value="todas" className="flex items-center gap-1 py-1.5 sm:py-2 text-[11px] sm:text-sm px-2 sm:px-3 col-span-4 sm:col-span-1">
                 <ListOrdered className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 Historial
               </TabsTrigger>
@@ -185,6 +191,9 @@ function AppContent() {
           </TabsContent>
           <TabsContent value="ventas" className="mt-0">
             <TransactionsView mode="venta" />
+          </TabsContent>
+          <TabsContent value="calculadora" className="mt-0">
+            <ProfitCalculator />
           </TabsContent>
           <TabsContent value="todas" className="mt-0">
             <TransactionsView mode="all" />

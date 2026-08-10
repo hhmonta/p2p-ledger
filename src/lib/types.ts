@@ -158,6 +158,8 @@ export interface Transaction {
   } | null
   // Total neto después de comisiones (lo que efectivamente entra/sale)
   netTotal: number
+  // URL o base64 de la captura de pantalla / comprobante
+  captureUrl: string | null
   date: string
   notes: string | null
   createdAt: string
@@ -177,6 +179,7 @@ export interface TransactionInput {
   status?: TransactionStatus
   reference?: string | null
   fee?: number
+  captureUrl?: string | null
   date?: string
   notes?: string | null
 }

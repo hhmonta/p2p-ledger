@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, ArrowRight, Sparkles, Lock, Unlock } from 'lucide-react'
+import { Loader2, ArrowRight, Sparkles, Lock, Unlock, Camera, X, Image as ImageIcon } from 'lucide-react'
 import type {
   Bank,
   Exchange,
@@ -57,6 +57,7 @@ const txSchema = z.object({
   status: z.enum(['pendiente', 'completada', 'cancelada']),
   reference: z.string().optional(),
   fee: z.coerce.number().min(0).default(0),
+  captureUrl: z.string().optional().nullable(),
   date: z.string().min(1),
   notes: z.string().optional(),
 })
@@ -88,6 +89,7 @@ export function TransactionForm({
   const [feeLocked, setFeeLocked] = useState(false) // si true, el fee NO se recalcula al cambiar inputs
   const [rateLocked, setRateLocked] = useState(false) // si true, la tasa NO se recalcula desde total
   const [totalInput, setTotalInput] = useState<string>('') // total bruto ingresado por el usuario
+  const [capturePreview, setCapturePreview] = useState<string | null>(null) // preview de la captura
 
   const activeBanks = useMemo(() => banks.filter((b) => b.isActive), [banks])
   const activeExchanges = useMemo(() => exchanges.filter((e) => e.isActive), [exchanges])
@@ -112,6 +114,7 @@ export function TransactionForm({
       status: 'completada',
       reference: '',
       fee: 0,
+      captureUrl: null,
       date: toDateTimeInputValue(new Date()),
       notes: '',
     },
@@ -133,9 +136,11 @@ export function TransactionForm({
           status: transaction.status,
           reference: transaction.reference ?? '',
           fee: transaction.fee,
+          captureUrl: transaction.captureUrl ?? null,
           date: toDateTimeInputValue(transaction.date),
           notes: transaction.notes ?? '',
         })
+        setCapturePreview(transaction.captureUrl ?? null)
         // Al editar, consideramos el fee como bloqueado (es el valor guardado)
         setFeeLocked(true)
       } else {
@@ -152,9 +157,11 @@ export function TransactionForm({
           status: 'completada',
           reference: '',
           fee: 0,
+          captureUrl: null,
           date: toDateTimeInputValue(new Date()),
           notes: '',
         })
+        setCapturePreview(null)
         setFeeLocked(false)
       }
     }
@@ -261,6 +268,7 @@ export function TransactionForm({
         status: values.status,
         reference: values.reference || null,
         fee: Number(values.fee),
+        captureUrl: values.captureUrl || null,
         date: new Date(values.date).toISOString(),
         notes: values.notes || null,
       }
@@ -886,6 +894,65 @@ export function TransactionForm({
                   {formatCurrency(netTotal, watchedCurrency)}
                 </span>
               </div>
+            </div>
+
+            {/* Captura / Comprobante */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <Camera className="h-3.5 w-3.5 text-blue-500" />
+                Captura / Comprobante
+              </label>
+              {capturePreview ? (
+                <div className="relative rounded-lg border overflow-hidden bg-muted/30">
+                  <img
+                    src={capturePreview}
+                    alt="Captura adjunta"
+                    className="w-full max-h-48 object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      form.setValue('captureUrl', null)
+                      setCapturePreview(null)
+                    }}
+                    className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full bg-background/80 border flex items-center justify-center hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                    title="Eliminar captura"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <label className="flex-1 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-emerald-400 dark:hover:border-emerald-600 p-4 cursor-pointer transition-colors text-center">
+                    <ImageIcon className="h-6 w-6 text-muted-foreground/50 mb-1" />
+                    <span className="text-xs text-muted-foreground">Toca para adjuntar imagen</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast({ title: 'Imagen muy grande', description: 'Máximo 5 MB.', variant: 'destructive' })
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                          const result = reader.result as string
+                          form.setValue('captureUrl', result)
+                          setCapturePreview(result)
+                        }
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+              <p className="text-[0.8rem] text-muted-foreground">
+                Adjunta una captura de pantalla del comprobante de la operación. Se guarda localmente en tu dispositivo.
+              </p>
             </div>
 
             <FormField
