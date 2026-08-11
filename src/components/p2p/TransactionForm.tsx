@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, ArrowRight, Sparkles, Lock, Unlock, Camera, X, Image as ImageIcon } from 'lucide-react'
+import { Loader2, ArrowRight, Sparkles, Lock, Unlock, Camera, X, Image as ImageIcon, FolderOpen } from 'lucide-react'
 import type {
   Bank,
   Exchange,
@@ -922,10 +922,12 @@ export function TransactionForm({
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <label className="flex-1 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-emerald-400 dark:hover:border-emerald-600 p-4 cursor-pointer transition-colors text-center">
-                    <ImageIcon className="h-6 w-6 text-muted-foreground/50 mb-1" />
-                    <span className="text-xs text-muted-foreground">Toca para adjuntar imagen</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Opción 1: Cámara */}
+                  <label className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-emerald-400 dark:hover:border-emerald-600 p-3 cursor-pointer transition-colors text-center">
+                    <Camera className="h-6 w-6 text-emerald-500 mb-1.5" />
+                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Cámara</span>
+                    <span className="text-[10px] text-muted-foreground">Tomar foto</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -948,10 +950,36 @@ export function TransactionForm({
                       }}
                     />
                   </label>
+                  {/* Opción 2: Buscar en dispositivo */}
+                  <label className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-blue-400 dark:hover:border-blue-600 p-3 cursor-pointer transition-colors text-center">
+                    <FolderOpen className="h-6 w-6 text-blue-500 mb-1.5" />
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Galería</span>
+                    <span className="text-[10px] text-muted-foreground">Buscar en dispositivo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast({ title: 'Imagen muy grande', description: 'Máximo 5 MB.', variant: 'destructive' })
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                          const result = reader.result as string
+                          form.setValue('captureUrl', result)
+                          setCapturePreview(result)
+                        }
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                  </label>
                 </div>
               )}
               <p className="text-[0.8rem] text-muted-foreground">
-                Adjunta una captura de pantalla del comprobante de la operación. Se guarda localmente en tu dispositivo.
+                Adjunta una captura del comprobante. Toma una foto o busca una imagen en tu dispositivo. Se guarda localmente.
               </p>
             </div>
 
