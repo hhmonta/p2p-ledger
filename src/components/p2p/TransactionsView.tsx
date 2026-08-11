@@ -96,9 +96,61 @@ function formatMonthLabel(monthKey: string): string {
   return `${monthNames[parseInt(month) - 1]} ${year}`
 }
 
-// Helper: guardar archivo preguntando al usuario dónde guardar (o descarga automática como fallback)
+// Helper: detectar si estamos en Capacitor (Android/iOS)
+function isCapacitorNative(): boolean {
+  return typeof window !== 'undefined' && !!(window as unknown as { Capacitor?: unknown }).Capacitor?.isNativePlatform?.() || !!(window as unknown as { Capacitor?: { platform?: string } }).Capacitor?.platform
+}
+
+// Helper: guardar archivo preguntando al usuario dónde guardar
+// En Android (Capacitor): guarda en Downloads y ofrece compartir
+// En Chrome/Edge desktop: diálogo nativo "Guardar como"
+// Fallback: descarga automática
 async function saveFile(blob: Blob, defaultName: string, description: string): Promise<boolean> {
-  // Intentar usar showSaveFilePicker (Chrome, Edge, Opera desktop)
+  // 1) Capacitor nativo (Android/iOS)
+  if (isCapacitorNative()) {
+    try {
+      const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
+      const { Share } = await import('@capacitor/share')
+
+      // Convertir blob a base64
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string
+          resolve(dataUrl.split(',')[1])
+        }
+        reader.readAsDataURL(blob)
+      })
+
+      // Guardar en la carpeta Downloads del dispositivo
+      const result = await Filesystem.writeFile({
+        path: `Download/${defaultName}`,
+        data: base64,
+        directory: Directory.ExternalStorage,
+        encoding: Encoding.Base64,
+        recursive: true,
+      })
+
+      // Ofrecer compartir el archivo (el usuario puede elegir "Guardar en..." o enviarlo)
+      const canShare = await Share.canShare()
+      if (canShare.value) {
+        await Share.share({
+          title: defaultName,
+          text: description,
+          url: result.uri,
+        })
+      }
+
+      return true
+    } catch (err) {
+      // Si share fue cancelado por el usuario, no es error
+      if (err instanceof Error && err.message?.includes('cancel')) return true
+      // Si filesystem falla (permisos), fallback a descarga web
+      console.warn('Capacitor save failed, falling back:', err)
+    }
+  }
+
+  // 2) showSaveFilePicker (Chrome, Edge, Opera desktop)
   if ('showSaveFilePicker' in window) {
     try {
       const ext = defaultName.split('.').pop() ?? 'txt'
@@ -118,12 +170,11 @@ async function saveFile(blob: Blob, defaultName: string, description: string): P
       await writable.close()
       return true
     } catch (err) {
-      // Usuario canceló el diálogo
       if (err instanceof Error && err.name === 'AbortError') return false
-      // Otro error: fallback a descarga automática
     }
   }
-  // Fallback: descarga automática (Android WebView, Firefox, Safari)
+
+  // 3) Fallback: descarga automática (Firefox, Safari, WebView sin Capacitor)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
