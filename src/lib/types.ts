@@ -205,6 +205,16 @@ export interface Stats {
     activoNeto: number
     gananciaEstimada: number
     gananciaNeta: number // ganancia estimada descontando comisiones
+    // Equivalentes en USD
+    totalComprasUSD: number
+    totalVentasUSD: number
+    feesComprasUSD: number
+    feesVentasUSD: number
+    feesTotalUSD: number
+    netComprasUSD: number
+    netVentasUSD: number
+    gananciaNetaUSD: number
+    activoNetoUSD: number
   }
   topCounterpartes: Array<{
     counterparty: string

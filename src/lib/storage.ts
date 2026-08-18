@@ -1054,6 +1054,18 @@ export async function getStats(): Promise<Stats> {
   const gananciaEstimada = gananciaBruta // bruta (sin comisiones)
   const gananciaNeta = gananciaBruta - feesTotal // neta (después de comisiones)
 
+  // Equivalentes en USD (usando tasa promedio general como referencia)
+  const avgRate = avgRateCompra > 0 && avgRateVenta > 0 ? (avgRateCompra + avgRateVenta) / 2 : avgRateCompra || avgRateVenta || 1
+  const totalComprasUSD = avgRate > 0 ? totalCompras / avgRate : 0
+  const totalVentasUSD = avgRate > 0 ? totalVentas / avgRate : 0
+  const feesComprasUSD = avgRate > 0 ? feesCompras / avgRate : 0
+  const feesVentasUSD = avgRate > 0 ? feesVentas / avgRate : 0
+  const feesTotalUSD = avgRate > 0 ? feesTotal / avgRate : 0
+  const netComprasUSD = avgRate > 0 ? netCompras / avgRate : 0
+  const netVentasUSD = avgRate > 0 ? netVentas / avgRate : 0
+  const gananciaNetaUSD = avgRate > 0 ? gananciaNeta / avgRate : 0
+  const activoNetoUSD = avgRate > 0 ? activoNeto / avgRate : 0
+
   // Top contrapartes
   const cpMap = new Map<string, { total: number; amount: number; count: number }>()
   for (const t of completadas) {
@@ -1154,6 +1166,15 @@ export async function getStats(): Promise<Stats> {
       activoNeto,
       gananciaEstimada,
       gananciaNeta,
+      totalComprasUSD,
+      totalVentasUSD,
+      feesComprasUSD,
+      feesVentasUSD,
+      feesTotalUSD,
+      netComprasUSD,
+      netVentasUSD,
+      gananciaNetaUSD,
+      activoNetoUSD,
     },
     topCounterpartes,
     activos,

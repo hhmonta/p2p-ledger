@@ -33,6 +33,7 @@ import {
   Trophy,
   Building2,
   Percent,
+  DollarSign,
 } from 'lucide-react'
 import type { Stats } from '@/lib/types'
 import { formatCurrency, formatNumber } from '@/lib/format'
@@ -93,64 +94,122 @@ export function Dashboard() {
         </p>
       </div>
 
-      {/* KPIs principales */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
-              Total comprado
-            </CardDescription>
-            <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-              {formatCurrency(r.totalCompras)}
-            </CardTitle>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">
-              {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} u.
-            </p>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
-              Total vendido
-            </CardDescription>
-            <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-              {formatCurrency(r.totalVentas)}
-            </CardTitle>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">
-              {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} u.
-            </p>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              Ganancia neta
-            </CardDescription>
-            <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
-              {formatCurrency(r.gananciaNeta)}
-            </CardTitle>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">
-              Spread × vol − fees
-            </p>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
-              Pendientes
-            </CardDescription>
-            <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-              {r.pendientes}
-            </CardTitle>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">
-              Por confirmar
-            </p>
-          </CardHeader>
-        </Card>
+      {/* KPIs principales - VES */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+          <Coins className="h-3 w-3" /> En VES (Bolívares)
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+          <Card className="p-0">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
+                Total comprado
+              </CardDescription>
+              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+                {formatCurrency(r.totalCompras)}
+              </CardTitle>
+              <p className="text-[9px] sm:text-xs text-muted-foreground">
+                {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} u.
+              </p>
+            </CardHeader>
+          </Card>
+          <Card className="p-0">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
+                Total vendido
+              </CardDescription>
+              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+                {formatCurrency(r.totalVentas)}
+              </CardTitle>
+              <p className="text-[9px] sm:text-xs text-muted-foreground">
+                {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} u.
+              </p>
+            </CardHeader>
+          </Card>
+          <Card className="p-0">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                Ganancia neta
+              </CardDescription>
+              <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
+                {formatCurrency(r.gananciaNeta)}
+              </CardTitle>
+              <p className="text-[9px] sm:text-xs text-muted-foreground">
+                Spread × vol − fees
+              </p>
+            </CardHeader>
+          </Card>
+          <Card className="p-0">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
+                Pendientes
+              </CardDescription>
+              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+                {r.pendientes}
+              </CardTitle>
+              <p className="text-[9px] sm:text-xs text-muted-foreground">
+                Por confirmar
+              </p>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+
+      {/* KPIs principales - USD */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+          <DollarSign className="h-3 w-3" /> En USD (Dólares)
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
+                Total comprado
+              </CardDescription>
+              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+                {formatCurrency(r.totalComprasUSD, 'USD')}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
+                Total vendido
+              </CardDescription>
+              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+                {formatCurrency(r.totalVentasUSD, 'USD')}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                Ganancia neta
+              </CardDescription>
+              <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
+                {formatCurrency(r.gananciaNetaUSD, 'USD')}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+                <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                Stock activo
+              </CardDescription>
+              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+                {formatCurrency(r.activoNetoUSD, 'USD')}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
       </div>
 
       {/* KPIs secundarios */}
@@ -207,7 +266,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Comisiones: bloque destacado */}
+      {/* Comisiones: bloque destacado VES + USD */}
       <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
         <CardContent className="p-2.5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
@@ -216,7 +275,7 @@ export function Dashboard() {
                 <Percent className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="text-[9px] sm:text-xs text-muted-foreground">Total comisiones</p>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Total comisiones (VES)</p>
                 <p className="text-base sm:text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
                   {formatCurrency(totalFees)}
                 </p>
@@ -235,6 +294,39 @@ export function Dashboard() {
                 <p className="text-[9px] sm:text-xs text-muted-foreground">Neto</p>
                 <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
                   {formatCurrency(totalNeto)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="border-blue-200 dark:border-blue-900/30 bg-blue-50/20 dark:bg-blue-950/5">
+        <CardContent className="p-2.5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <div className="h-7 w-7 sm:h-10 sm:w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <DollarSign className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Total comisiones (USD)</p>
+                <p className="text-base sm:text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400 leading-tight">
+                  {formatCurrency(r.feesTotalUSD, 'USD')}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-4 flex-1 text-[11px] sm:text-sm">
+              <div>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Compras</p>
+                <p className="font-medium tabular-nums">{formatCurrency(r.feesComprasUSD, 'USD')}</p>
+              </div>
+              <div>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Ventas</p>
+                <p className="font-medium tabular-nums">{formatCurrency(r.feesVentasUSD, 'USD')}</p>
+              </div>
+              <div>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Neto</p>
+                <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(r.netComprasUSD + r.netVentasUSD, 'USD')}
                 </p>
               </div>
             </div>
