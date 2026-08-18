@@ -90,4 +90,4 @@ server.log
 /android/local.properties
 
 # Capacitor
-/capacitor-cordova-android-plugins/
+/capacitor-cordova-android-plugins/tool-results/
