@@ -1,0 +1,793 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useEffect, useState } from 'react'
+     4→     4→import { useForm, useFieldArray } from 'react-hook-form'
+     5→     5→import { zodResolver } from '@hookform/resolvers/zod'
+     6→     6→import { z } from 'zod'
+     7→     7→import {
+     8→     8→  Dialog,
+     9→     9→  DialogContent,
+    10→    10→  DialogDescription,
+    11→    11→  DialogFooter,
+    12→    12→  DialogHeader,
+    13→    13→  DialogTitle,
+    14→    14→} from '@/components/ui/dialog'
+    15→    15→import {
+    16→    16→  Form,
+    17→    17→  FormControl,
+    18→    18→  FormDescription,
+    19→    19→  FormField,
+    20→    20→  FormItem,
+    21→    21→  FormLabel,
+    22→    22→  FormMessage,
+    23→    23→} from '@/components/ui/form'
+    24→    24→import { Input } from '@/components/ui/input'
+    25→    25→import { Button } from '@/components/ui/button'
+    26→    26→import {
+    27→    27→  Select,
+    28→    28→  SelectContent,
+    29→    29→  SelectItem,
+    30→    30→  SelectTrigger,
+    31→    31→  SelectValue,
+    32→    32→} from '@/components/ui/select'
+    33→    33→import { Textarea } from '@/components/ui/textarea'
+    34→    34→import { Switch } from '@/components/ui/switch'
+    35→    35→import { Loader2, Plus, Trash2, Layers, Percent, Tag } from 'lucide-react'
+    36→    36→import type { Exchange, ExchangeInput, FeeType, FeeTier } from '@/lib/types'
+    37→    37→import { toast } from '@/hooks/use-toast'
+    38→    38→import * as storage from '@/lib/storage'
+    39→    39→
+    40→    40→// Schema de un tier
+    41→    41→const tierSchema = z.object({
+    42→    42→  minAmount: z.coerce.number().min(0),
+    43→    43→  feeType: z.enum(['percent', 'fixed']),
+    44→    44→  feeValue: z.coerce.number().min(0),
+    45→    45→})
+    46→    46→
+    47→    47→const exchangeSchema = z.object({
+    48→    48→  name: z.string().min(1, 'El nombre es obligatorio'),
+    49→    49→  shortName: z.string().optional(),
+    50→    50→  color: z.string().min(1),
+    51→    51→  buyFeeType: z.enum(['percent', 'fixed']),
+    52→    52→  buyFeeValue: z.coerce.number().min(0),
+    53→    53→  buyTiers: z.array(tierSchema).optional(),
+    54→    54→  sellFeeType: z.enum(['percent', 'fixed']),
+    55→    55→  sellFeeValue: z.coerce.number().min(0),
+    56→    56→  sellTiers: z.array(tierSchema).optional(),
+    57→    57→  fixedFee: z.coerce.number().min(0).default(0),
+    58→    58→  fixedFeeCurrency: z.string().min(1),
+    59→    59→  discountPercent: z.coerce.number().min(0).max(100).default(0),
+    60→    60→  discountLabel: z.string().optional(),
+    61→    61→  isActive: z.boolean().default(true),
+    62→    62→  notes: z.string().optional(),
+    63→    63→})
+    64→    64→
+    65→    65→type FormValues = z.infer<typeof exchangeSchema>
+    66→    66→type TierField = { minAmount: number; feeType: 'percent' | 'fixed'; feeValue: number }
+    67→    67→
+    68→    68→const COLORS = [
+    69→    69→  { name: 'Esmeralda', value: '#10b981' },
+    70→    70→  { name: 'Ámbar', value: '#f59e0b' },
+    71→    71→  { name: 'Rosa', value: '#ec4899' },
+    72→    72→  { name: 'Violeta', value: '#8b5cf6' },
+    73→    73→  { name: 'Cyan', value: '#06b6d4' },
+    74→    74→  { name: 'Rojo', value: '#ef4444' },
+    75→    75→  { name: 'Lima', value: '#84cc16' },
+    76→    76→  { name: 'Naranja', value: '#f97316' },
+    77→    77→  { name: 'Slate', value: '#64748b' },
+    78→    78→  { name: 'Turquesa', value: '#14b8a6' },
+    79→    79→  { name: 'Amarillo', value: '#facc15' },
+    80→    80→  { name: 'Azul', value: '#3b82f6' },
+    81→    81→  { name: 'Negro', value: '#0a0a0a' },
+    82→    82→  { name: 'Fucsia', value: '#d946ef' },
+    83→    83→]
+    84→    84→
+    85→    85→const CURRENCIES = ['USDT', 'USDC', 'BTC', 'ETH', 'USD', 'EUR', 'VES', 'COP', 'ARS', 'MXN', 'BRL']
+    86→    86→
+    87→    87→interface ExchangeFormProps {
+    88→    88→  open: boolean
+    89→    89→  onOpenChange: (open: boolean) => void
+    90→    90→  exchange?: Exchange | null
+    91→    91→  onSaved: () => void
+    92→    92→}
+    93→    93→
+    94→    94→export function ExchangeForm({
+    95→    95→  open,
+    96→    96→  onOpenChange,
+    97→    97→  exchange,
+    98→    98→  onSaved,
+    99→    99→}: ExchangeFormProps) {
+   100→   100→  const [submitting, setSubmitting] = useState(false)
+   101→   101→
+   102→   102→  const form = useForm<FormValues>({
+   103→   103→    resolver: zodResolver(exchangeSchema),
+   104→   104→    defaultValues: {
+   105→   105→      name: '',
+   106→   106→      shortName: '',
+   107→   107→      color: '#3b82f6',
+   108→   108→      buyFeeType: 'percent',
+   109→   109→      buyFeeValue: 0,
+   110→   110→      buyTiers: [],
+   111→   111→      sellFeeType: 'percent',
+   112→   112→      sellFeeValue: 0,
+   113→   113→      sellTiers: [],
+   114→   114→      fixedFee: 0,
+   115→   115→      fixedFeeCurrency: 'USDT',
+   116→   116→      discountPercent: 0,
+   117→   117→      discountLabel: '',
+   118→   118→      isActive: true,
+   119→   119→      notes: '',
+   120→   120→    },
+   121→   121→  })
+   122→   122→
+   123→   123→  // Field arrays para tiers dinámicos
+   124→   124→  const buyTiersField = useFieldArray({ control: form.control, name: 'buyTiers' })
+   125→   125→  const sellTiersField = useFieldArray({ control: form.control, name: 'sellTiers' })
+   126→   126→
+   127→   127→  useEffect(() => {
+   128→   128→    if (open) {
+   129→   129→      if (exchange) {
+   130→   130→        form.reset({
+   131→   131→          name: exchange.name,
+   132→   132→          shortName: exchange.shortName ?? '',
+   133→   133→          color: exchange.color,
+   134→   134→          buyFeeType: exchange.buyFeeType as FeeType,
+   135→   135→          buyFeeValue: exchange.buyFeeValue,
+   136→   136→          buyTiers: (exchange.buyTiers ?? []).map((t) => ({
+   137→   137→            minAmount: t.minAmount,
+   138→   138→            feeType: t.feeType,
+   139→   139→            feeValue: t.feeValue,
+   140→   140→          })),
+   141→   141→          sellFeeType: exchange.sellFeeType as FeeType,
+   142→   142→          sellFeeValue: exchange.sellFeeValue,
+   143→   143→          sellTiers: (exchange.sellTiers ?? []).map((t) => ({
+   144→   144→            minAmount: t.minAmount,
+   145→   145→            feeType: t.feeType,
+   146→   146→            feeValue: t.feeValue,
+   147→   147→          })),
+   148→   148→          fixedFee: exchange.fixedFee,
+   149→   149→          fixedFeeCurrency: exchange.fixedFeeCurrency,
+   150→   150→          discountPercent: exchange.discountPercent,
+   151→   151→          discountLabel: exchange.discountLabel ?? '',
+   152→   152→          isActive: exchange.isActive,
+   153→   153→          notes: exchange.notes ?? '',
+   154→   154→        })
+   155→   155→      } else {
+   156→   156→        form.reset({
+   157→   157→          name: '',
+   158→   158→          shortName: '',
+   159→   159→          color: '#3b82f6',
+   160→   160→          buyFeeType: 'percent',
+   161→   161→          buyFeeValue: 0,
+   162→   162→          buyTiers: [],
+   163→   163→          sellFeeType: 'percent',
+   164→   164→          sellFeeValue: 0,
+   165→   165→          sellTiers: [],
+   166→   166→          fixedFee: 0,
+   167→   167→          fixedFeeCurrency: 'USDT',
+   168→   168→          discountPercent: 0,
+   169→   169→          discountLabel: '',
+   170→   170→          isActive: true,
+   171→   171→          notes: '',
+   172→   172→        })
+   173→   173→      }
+   174→   174→    }
+   175→   175→  }, [open, exchange, form])
+   176→   176→
+   177→   177→  async function onSubmit(values: FormValues) {
+   178→   178→    setSubmitting(true)
+   179→   179→    try {
+   180→   180→      // Sanitizar tiers: ordenar por minAmount asc y filtrar vacíos
+   181→   181→      const cleanTiers = (tiers: TierField[] | undefined): FeeTier[] => {
+   182→   182→        if (!tiers || tiers.length === 0) return []
+   183→   183→        return [...tiers]
+   184→   184→          .filter((t) => t.minAmount !== undefined && t.feeValue !== undefined)
+   185→   185→          .map((t) => ({
+   186→   186→            minAmount: Number(t.minAmount),
+   187→   187→            feeType: t.feeType as FeeType,
+   188→   188→            feeValue: Number(t.feeValue),
+   189→   189→          }))
+   190→   190→          .sort((a, b) => a.minAmount - b.minAmount)
+   191→   191→      }
+   192→   192→
+   193→   193→      const payload: ExchangeInput = {
+   194→   194→        name: values.name,
+   195→   195→        shortName: values.shortName || null,
+   196→   196→        color: values.color,
+   197→   197→        buyFeeType: values.buyFeeType,
+   198→   198→        buyFeeValue: Number(values.buyFeeValue),
+   199→   199→        buyTiers: cleanTiers(values.buyTiers as TierField[] | undefined),
+   200→   200→        sellFeeType: values.sellFeeType,
+   201→   201→        sellFeeValue: Number(values.sellFeeValue),
+   202→   202→        sellTiers: cleanTiers(values.sellTiers as TierField[] | undefined),
+   203→   203→        fixedFee: Number(values.fixedFee),
+   204→   204→        fixedFeeCurrency: values.fixedFeeCurrency,
+   205→   205→        discountPercent: Number(values.discountPercent),
+   206→   206→        discountLabel: values.discountLabel || null,
+   207→   207→        isActive: values.isActive,
+   208→   208→        notes: values.notes || null,
+   209→   209→      }
+   210→   210→
+   211→   211→      if (exchange) {
+   212→   212→        await storage.updateExchange(exchange.id, payload)
+   213→   213→      } else {
+   214→   214→        await storage.createExchange(payload)
+   215→   215→      }
+   216→   216→
+   217→   217→      toast({
+   218→   218→        title: exchange ? 'Exchange actualizado' : 'Exchange creado',
+   219→   219→        description: `«${values.name}» se guardó correctamente.`,
+   220→   220→      })
+   221→   221→      onSaved()
+   222→   222→      onOpenChange(false)
+   223→   223→    } catch (e) {
+   224→   224→      toast({
+   225→   225→        title: 'Error',
+   226→   226→        description: e instanceof Error ? e.message : 'Error desconocido',
+   227→   227→        variant: 'destructive',
+   228→   228→      })
+   229→   229→    } finally {
+   230→   230→      setSubmitting(false)
+   231→   231→    }
+   232→   232→  }
+   233→   233→
+   234→   234→  const buyFeeType = form.watch('buyFeeType')
+   235→   235→  const sellFeeType = form.watch('sellFeeType')
+   236→   236→  const buyTiers = form.watch('buyTiers') ?? []
+   237→   237→  const sellTiers = form.watch('sellTiers') ?? []
+   238→   238→  const discountPercent = form.watch('discountPercent')
+   239→   239→
+   240→   240→  return (
+   241→   241→    <Dialog open={open} onOpenChange={onOpenChange}>
+   242→   242→      <DialogContent className="sm:max-w-[640px] max-h-[94vh] overflow-y-auto">
+   243→   243→        <DialogHeader>
+   244→   244→          <DialogTitle>
+   245→   245→            {exchange ? 'Editar exchange' : 'Nuevo exchange'}
+   246→   246→          </DialogTitle>
+   247→   247→          <DialogDescription>
+   248→   248→            Configura la plataforma P2P y sus comisiones. Puedes definir comisiones escalonadas
+   249→   249→            por monto y descuentos VIP/BNB que se aplican automáticamente.
+   250→   250→          </DialogDescription>
+   251→   251→        </DialogHeader>
+   252→   252→
+   253→   253→        <Form {...form}>
+   254→   254→          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+   255→   255→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   256→   256→              <FormField
+   257→   257→                control={form.control}
+   258→   258→                name="name"
+   259→   259→                render={({ field }) => (
+   260→   260→                  <FormItem className="sm:col-span-2">
+   261→   261→                    <FormLabel>Nombre del exchange *</FormLabel>
+   262→   262→                    <FormControl>
+   263→   263→                      <Input
+   264→   264→                        placeholder="Ej: Binance P2P, OKX, Mercado Libre..."
+   265→   265→                        {...field}
+   266→   266→                      />
+   267→   267→                    </FormControl>
+   268→   268→                    <FormMessage />
+   269→   269→                  </FormItem>
+   270→   270→                )}
+   271→   271→              />
+   272→   272→
+   273→   273→              <FormField
+   274→   274→                control={form.control}
+   275→   275→                name="shortName"
+   276→   276→                render={({ field }) => (
+   277→   277→                  <FormItem>
+   278→   278→                    <FormLabel>Nombre corto (opcional)</FormLabel>
+   279→   279→                    <FormControl>
+   280→   280→                      <Input
+   281→   281→                        placeholder="Ej: BIN, OKX, ML"
+   282→   282→                        maxLength={6}
+   283→   283→                        {...field}
+   284→   284→                      />
+   285→   285→                    </FormControl>
+   286→   286→                    <FormDescription>
+   287→   287→                      Etiqueta corta para badges.
+   288→   288→                    </FormDescription>
+   289→   289→                    <FormMessage />
+   290→   290→                  </FormItem>
+   291→   291→                )}
+   292→   292→              />
+   293→   293→
+   294→   294→              <FormField
+   295→   295→                control={form.control}
+   296→   296→                name="isActive"
+   297→   297→                render={({ field }) => (
+   298→   298→                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-[60px]">
+   299→   299→                    <div className="space-y-0.5">
+   300→   300→                      <FormLabel>Activo</FormLabel>
+   301→   301→                      <FormDescription>
+   302→   302→                        Inactivo oculta el exchange en selects.
+   303→   303→                      </FormDescription>
+   304→   304→                    </div>
+   305→   305→                    <FormControl>
+   306→   306→                      <Switch
+   307→   307→                        checked={field.value}
+   308→   308→                        onCheckedChange={field.onChange}
+   309→   309→                      />
+   310→   310→                    </FormControl>
+   311→   311→                  </FormItem>
+   312→   312→                )}
+   313→   313→              />
+   314→   314→            </div>
+   315→   315→
+   316→   316→            {/* =========== COMISIONES DE COMPRA =========== */}
+   317→   317→            <div className="rounded-lg border p-3 space-y-3 bg-emerald-50/30 dark:bg-emerald-950/10">
+   318→   318→              <div className="flex items-center justify-between">
+   319→   319→                <div className="flex items-center gap-2">
+   320→   320→                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+   321→   321→                  <h4 className="text-sm font-medium">Comisión al comprar</h4>
+   322→   322→                </div>
+   323→   323→                {buyTiers.length > 0 && (
+   324→   324→                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+   325→   325→                    {buyTiers.length} {buyTiers.length === 1 ? 'tier' : 'tiers'} activos
+   326→   326→                  </span>
+   327→   327→                )}
+   328→   328→              </div>
+   329→   329→
+   330→   330→              {/* Comisión base (se usa si no hay tiers) */}
+   331→   331→              <div className="grid grid-cols-2 gap-3">
+   332→   332→                <FormField
+   333→   333→                  control={form.control}
+   334→   334→                  name="buyFeeType"
+   335→   335→                  render={({ field }) => (
+   336→   336→                    <FormItem>
+   337→   337→                      <FormLabel className="text-xs">Tipo base</FormLabel>
+   338→   338→                      <Select onValueChange={field.onChange} value={field.value}>
+   339→   339→                        <FormControl>
+   340→   340→                          <SelectTrigger className="h-9">
+   341→   341→                            <SelectValue />
+   342→   342→                          </SelectTrigger>
+   343→   343→                        </FormControl>
+   344→   344→                        <SelectContent>
+   345→   345→                          <SelectItem value="percent">Porcentual (%)</SelectItem>
+   346→   346→                          <SelectItem value="fixed">Fijo (monto)</SelectItem>
+   347→   347→                        </SelectContent>
+   348→   348→                      </Select>
+   349→   349→                      <FormMessage />
+   350→   350→                    </FormItem>
+   351→   351→                  )}
+   352→   352→                />
+   353→   353→                <FormField
+   354→   354→                  control={form.control}
+   355→   355→                  name="buyFeeValue"
+   356→   356→                  render={({ field }) => (
+   357→   357→                    <FormItem>
+   358→   358→                      <FormLabel className="text-xs">
+   359→   359→                        {buyFeeType === 'percent' ? 'Valor (%) base' : 'Monto base'}
+   360→   360→                      </FormLabel>
+   361→   361→                      <FormControl>
+   362→   362→                        <Input
+   363→   363→                          type="number"
+   364→   364→                          step="0.0001"
+   365→   365→                          placeholder="0"
+   366→   366→                          disabled={buyTiers.length > 0}
+   367→   367→                          {...field}
+   368→   368→                        />
+   369→   369→                      </FormControl>
+   370→   370→                      <FormMessage />
+   371→   371→                    </FormItem>
+   372→   372→                  )}
+   373→   373→                />
+   374→   374→              </div>
+   375→   375→
+   376→   376→              {/* Tiers escalonados de compra */}
+   377→   377→              <div className="space-y-2">
+   378→   378→                <div className="flex items-center justify-between">
+   379→   379→                  <FormLabel className="text-xs flex items-center gap-1">
+   380→   380→                    <Layers className="h-3 w-3" />
+   381→   381→                    Tiers escalonados (opcional)
+   382→   382→                  </FormLabel>
+   383→   383→                  <Button
+   384→   384→                    type="button"
+   385→   385→                    variant="outline"
+   386→   386→                    size="sm"
+   387→   387→                    className="h-7 text-xs"
+   388→   388→                    onClick={() =>
+   389→   389→                      buyTiersField.append({
+   390→   390→                        minAmount: buyTiers.length > 0 ? Math.max(...buyTiers.map((t) => Number(t.minAmount))) + 1000 : 0,
+   391→   391→                        feeType: 'percent',
+   392→   392→                        feeValue: 0.1,
+   393→   393→                      })
+   394→   394→                    }
+   395→   395→                  >
+   396→   396→                    <Plus className="h-3 w-3 mr-1" /> Añadir tier
+   397→   397→                  </Button>
+   398→   398→                </div>
+   399→   399→                {buyTiers.length === 0 ? (
+   400→   400→                  <p className="text-xs text-muted-foreground italic">
+   401→   401→                    Sin tiers. Se usará la comisión base para cualquier monto.
+   402→   402→                  </p>
+   403→   403→                ) : (
+   404→   404→                  <div className="space-y-2">
+   405→   405→                    {buyTiersField.fields.map((t, i) => (
+   406→   406→                      <div
+   407→   407→                        key={t.id}
+   408→   408→                        className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center p-2 rounded border bg-background"
+   409→   409→                      >
+   410→   410→                        <div>
+   411→   411→                          <label className="text-[10px] text-muted-foreground">Monto mín.</label>
+   412→   412→                          <Input
+   413→   413→                            type="number"
+   414→   414→                            step="0.01"
+   415→   415→                            className="h-8 text-xs"
+   416→   416→                            {...form.register(`buyTiers.${i}.minAmount` as const)}
+   417→   417→                          />
+   418→   418→                        </div>
+   419→   419→                        <div>
+   420→   420→                          <label className="text-[10px] text-muted-foreground">Tipo</label>
+   421→   421→                          <Select
+   422→   422→                            onValueChange={(v) =>
+   423→   423→                              form.setValue(`buyTiers.${i}.feeType` as const, v as 'percent' | 'fixed')
+   424→   424→                            }
+   425→   425→                            value={form.watch(`buyTiers.${i}.feeType` as const)}
+   426→   426→                          >
+   427→   427→                            <SelectTrigger className="h-8 text-xs">
+   428→   428→                              <SelectValue />
+   429→   429→                            </SelectTrigger>
+   430→   430→                            <SelectContent>
+   431→   431→                              <SelectItem value="percent">%</SelectItem>
+   432→   432→                              <SelectItem value="fixed">Fijo</SelectItem>
+   433→   433→                            </SelectContent>
+   434→   434→                          </Select>
+   435→   435→                        </div>
+   436→   436→                        <div>
+   437→   437→                          <label className="text-[10px] text-muted-foreground">Valor</label>
+   438→   438→                          <Input
+   439→   439→                            type="number"
+   440→   440→                            step="0.0001"
+   441→   441→                            className="h-8 text-xs"
+   442→   442→                            {...form.register(`buyTiers.${i}.feeValue` as const)}
+   443→   443→                          />
+   444→   444→                        </div>
+   445→   445→                        <Button
+   446→   446→                          type="button"
+   447→   447→                          variant="ghost"
+   448→   448→                          size="icon"
+   449→   449→                          className="h-8 w-8 hover:text-rose-600"
+   450→   450→                          onClick={() => buyTiersField.remove(i)}
+   451→   451→                        >
+   452→   452→                          <Trash2 className="h-3.5 w-3.5" />
+   453→   453→                        </Button>
+   454→   454→                      </div>
+   455→   455→                    ))}
+   456→   456→                    <p className="text-[10px] text-muted-foreground">
+   457→   457→                      Se aplicará el tier con el mayor monto mínimo que sea ≤ al total de la operación.
+   458→   458→                    </p>
+   459→   459→                  </div>
+   460→   460→                )}
+   461→   461→              </div>
+   462→   462→            </div>
+   463→   463→
+   464→   464→            {/* =========== COMISIONES DE VENTA =========== */}
+   465→   465→            <div className="rounded-lg border p-3 space-y-3 bg-rose-50/30 dark:bg-rose-950/10">
+   466→   466→              <div className="flex items-center justify-between">
+   467→   467→                <div className="flex items-center gap-2">
+   468→   468→                  <div className="h-2 w-2 rounded-full bg-rose-500" />
+   469→   469→                  <h4 className="text-sm font-medium">Comisión al vender</h4>
+   470→   470→                </div>
+   471→   471→                {sellTiers.length > 0 && (
+   472→   472→                  <span className="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-700 dark:text-rose-300">
+   473→   473→                    {sellTiers.length} {sellTiers.length === 1 ? 'tier' : 'tiers'} activos
+   474→   474→                  </span>
+   475→   475→                )}
+   476→   476→              </div>
+   477→   477→
+   478→   478→              <div className="grid grid-cols-2 gap-3">
+   479→   479→                <FormField
+   480→   480→                  control={form.control}
+   481→   481→                  name="sellFeeType"
+   482→   482→                  render={({ field }) => (
+   483→   483→                    <FormItem>
+   484→   484→                      <FormLabel className="text-xs">Tipo base</FormLabel>
+   485→   485→                      <Select onValueChange={field.onChange} value={field.value}>
+   486→   486→                        <FormControl>
+   487→   487→                          <SelectTrigger className="h-9">
+   488→   488→                            <SelectValue />
+   489→   489→                          </SelectTrigger>
+   490→   490→                        </FormControl>
+   491→   491→                        <SelectContent>
+   492→   492→                          <SelectItem value="percent">Porcentual (%)</SelectItem>
+   493→   493→                          <SelectItem value="fixed">Fijo (monto)</SelectItem>
+   494→   494→                        </SelectContent>
+   495→   495→                      </Select>
+   496→   496→                      <FormMessage />
+   497→   497→                    </FormItem>
+   498→   498→                  )}
+   499→   499→                />
+   500→   500→                <FormField
+   501→   501→                  control={form.control}
+   502→   502→                  name="sellFeeValue"
+   503→   503→                  render={({ field }) => (
+   504→   504→                    <FormItem>
+   505→   505→                      <FormLabel className="text-xs">
+   506→   506→                        {sellFeeType === 'percent' ? 'Valor (%) base' : 'Monto base'}
+   507→   507→                      </FormLabel>
+   508→   508→                      <FormControl>
+   509→   509→                        <Input
+   510→   510→                          type="number"
+   511→   511→                          step="0.0001"
+   512→   512→                          placeholder="0"
+   513→   513→                          disabled={sellTiers.length > 0}
+   514→   514→                          {...field}
+   515→   515→                        />
+   516→   516→                      </FormControl>
+   517→   517→                      <FormMessage />
+   518→   518→                    </FormItem>
+   519→   519→                  )}
+   520→   520→                />
+   521→   521→              </div>
+   522→   522→
+   523→   523→              <div className="space-y-2">
+   524→   524→                <div className="flex items-center justify-between">
+   525→   525→                  <FormLabel className="text-xs flex items-center gap-1">
+   526→   526→                    <Layers className="h-3 w-3" />
+   527→   527→                    Tiers escalonados (opcional)
+   528→   528→                  </FormLabel>
+   529→   529→                  <Button
+   530→   530→                    type="button"
+   531→   531→                    variant="outline"
+   532→   532→                    size="sm"
+   533→   533→                    className="h-7 text-xs"
+   534→   534→                    onClick={() =>
+   535→   535→                      sellTiersField.append({
+   536→   536→                        minAmount: sellTiers.length > 0 ? Math.max(...sellTiers.map((t) => Number(t.minAmount))) + 1000 : 0,
+   537→   537→                        feeType: 'percent',
+   538→   538→                        feeValue: 0.1,
+   539→   539→                      })
+   540→   540→                    }
+   541→   541→                  >
+   542→   542→                    <Plus className="h-3 w-3 mr-1" /> Añadir tier
+   543→   543→                  </Button>
+   544→   544→                </div>
+   545→   545→                {sellTiers.length === 0 ? (
+   546→   546→                  <p className="text-xs text-muted-foreground italic">
+   547→   547→                    Sin tiers. Se usará la comisión base para cualquier monto.
+   548→   548→                  </p>
+   549→   549→                ) : (
+   550→   550→                  <div className="space-y-2">
+   551→   551→                    {sellTiersField.fields.map((t, i) => (
+   552→   552→                      <div
+   553→   553→                        key={t.id}
+   554→   554→                        className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center p-2 rounded border bg-background"
+   555→   555→                      >
+   556→   556→                        <div>
+   557→   557→                          <label className="text-[10px] text-muted-foreground">Monto mín.</label>
+   558→   558→                          <Input
+   559→   559→                            type="number"
+   560→   560→                            step="0.01"
+   561→   561→                            className="h-8 text-xs"
+   562→   562→                            {...form.register(`sellTiers.${i}.minAmount` as const)}
+   563→   563→                          />
+   564→   564→                        </div>
+   565→   565→                        <div>
+   566→   566→                          <label className="text-[10px] text-muted-foreground">Tipo</label>
+   567→   567→                          <Select
+   568→   568→                            onValueChange={(v) =>
+   569→   569→                              form.setValue(`sellTiers.${i}.feeType` as const, v as 'percent' | 'fixed')
+   570→   570→                            }
+   571→   571→                            value={form.watch(`sellTiers.${i}.feeType` as const)}
+   572→   572→                          >
+   573→   573→                            <SelectTrigger className="h-8 text-xs">
+   574→   574→                              <SelectValue />
+   575→   575→                            </SelectTrigger>
+   576→   576→                            <SelectContent>
+   577→   577→                              <SelectItem value="percent">%</SelectItem>
+   578→   578→                              <SelectItem value="fixed">Fijo</SelectItem>
+   579→   579→                            </SelectContent>
+   580→   580→                          </Select>
+   581→   581→                        </div>
+   582→   582→                        <div>
+   583→   583→                          <label className="text-[10px] text-muted-foreground">Valor</label>
+   584→   584→                          <Input
+   585→   585→                            type="number"
+   586→   586→                            step="0.0001"
+   587→   587→                            className="h-8 text-xs"
+   588→   588→                            {...form.register(`sellTiers.${i}.feeValue` as const)}
+   589→   589→                          />
+   590→   590→                        </div>
+   591→   591→                        <Button
+   592→   592→                          type="button"
+   593→   593→                          variant="ghost"
+   594→   594→                          size="icon"
+   595→   595→                          className="h-8 w-8 hover:text-rose-600"
+   596→   596→                          onClick={() => sellTiersField.remove(i)}
+   597→   597→                        >
+   598→   598→                          <Trash2 className="h-3.5 w-3.5" />
+   599→   599→                        </Button>
+   600→   600→                      </div>
+   601→   601→                    ))}
+   602→   602→                    <p className="text-[10px] text-muted-foreground">
+   603→   603→                      Se aplicará el tier con el mayor monto mínimo que sea ≤ al total de la operación.
+   604→   604→                    </p>
+   605→   605→                  </div>
+   606→   606→                )}
+   607→   607→              </div>
+   608→   608→            </div>
+   609→   609→
+   610→   610→            {/* =========== DESCUENTO VIP / BNB =========== */}
+   611→   611→            <div className="rounded-lg border p-3 space-y-3 bg-violet-50/30 dark:bg-violet-950/10">
+   612→   612→              <div className="flex items-center gap-2">
+   613→   613→                <div className="h-2 w-2 rounded-full bg-violet-500" />
+   614→   614→                <h4 className="text-sm font-medium flex items-center gap-1">
+   615→   615→                  <Tag className="h-3.5 w-3.5" />
+   616→   616→                  Descuento VIP / BNB (opcional)
+   617→   617→                </h4>
+   618→   618→              </div>
+   619→   619→              <div className="grid grid-cols-2 gap-3">
+   620→   620→                <FormField
+   621→   621→                  control={form.control}
+   622→   622→                  name="discountPercent"
+   623→   623→                  render={({ field }) => (
+   624→   624→                    <FormItem>
+   625→   625→                      <FormLabel className="text-xs">Descuento (%)</FormLabel>
+   626→   626→                      <FormControl>
+   627→   627→                        <Input
+   628→   628→                          type="number"
+   629→   629→                          step="0.01"
+   630→   630→                          min="0"
+   631→   631→                          max="100"
+   632→   632→                          placeholder="0"
+   633→   633→                          {...field}
+   634→   634→                        />
+   635→   635→                      </FormControl>
+   636→   636→                      <FormDescription className="text-[10px]">
+   637→   637→                        Se aplica sobre la comisión variable (no sobre la fija).
+   638→   638→                      </FormDescription>
+   639→   639→                      <FormMessage />
+   640→   640→                    </FormItem>
+   641→   641→                  )}
+   642→   642→                />
+   643→   643→                <FormField
+   644→   644→                  control={form.control}
+   645→   645→                  name="discountLabel"
+   646→   646→                  render={({ field }) => (
+   647→   647→                    <FormItem>
+   648→   648→                      <FormLabel className="text-xs">Etiqueta (opcional)</FormLabel>
+   649→   649→                      <FormControl>
+   650→   650→                        <Input
+   651→   651→                          placeholder="Ej: Descuento BNB, VIP Nivel 3..."
+   652→   652→                          {...field}
+   653→   653→                        />
+   654→   654→                      </FormControl>
+   655→   655→                      <FormMessage />
+   656→   656→                    </FormItem>
+   657→   657→                  )}
+   658→   658→                />
+   659→   659→              </div>
+   660→   660→              {discountPercent > 0 && (
+   661→   661→                <p className="text-xs text-violet-700 dark:text-violet-300">
+   662→   662→                  ✓ {discountPercent}% de descuento se aplicará sobre la comisión calculada en cada operación.
+   663→   663→                </p>
+   664→   664→              )}
+   665→   665→            </div>
+   666→   666→
+   667→   667→            {/* =========== COMISIÓN FIJA ADICIONAL =========== */}
+   668→   668→            <div className="rounded-lg border p-3 space-y-3 bg-amber-50/30 dark:bg-amber-950/10">
+   669→   669→              <div className="flex items-center gap-2">
+   670→   670→                <div className="h-2 w-2 rounded-full bg-amber-500" />
+   671→   671→                <h4 className="text-sm font-medium flex items-center gap-1">
+   672→   672→                  <Percent className="h-3.5 w-3.5" />
+   673→   673→                  Comisión fija adicional (opcional)
+   674→   674→                </h4>
+   675→   675→              </div>
+   676→   676→              <div className="grid grid-cols-2 gap-3">
+   677→   677→                <FormField
+   678→   678→                  control={form.control}
+   679→   679→                  name="fixedFee"
+   680→   680→                  render={({ field }) => (
+   681→   681→                    <FormItem>
+   682→   682→                      <FormLabel className="text-xs">Monto</FormLabel>
+   683→   683→                      <FormControl>
+   684→   684→                        <Input
+   685→   685→                          type="number"
+   686→   686→                          step="0.0001"
+   687→   687→                          placeholder="0"
+   688→   688→                          {...field}
+   689→   689→                        />
+   690→   690→                      </FormControl>
+   691→   691→                      <FormMessage />
+   692→   692→                    </FormItem>
+   693→   693→                  )}
+   694→   694→                />
+   695→   695→                <FormField
+   696→   696→                  control={form.control}
+   697→   697→                  name="fixedFeeCurrency"
+   698→   698→                  render={({ field }) => (
+   699→   699→                    <FormItem>
+   700→   700→                      <FormLabel className="text-xs">Moneda</FormLabel>
+   701→   701→                      <Select onValueChange={field.onChange} value={field.value}>
+   702→   702→                        <FormControl>
+   703→   703→                          <SelectTrigger className="h-9">
+   704→   704→                            <SelectValue />
+   705→   705→                          </SelectTrigger>
+   706→   706→                        </FormControl>
+   707→   707→                        <SelectContent>
+   708→   708→                          {CURRENCIES.map((c) => (
+   709→   709→                            <SelectItem key={c} value={c}>
+   710→   710→                              {c}
+   711→   711→                            </SelectItem>
+   712→   712→                          ))}
+   713→   713→                        </SelectContent>
+   714→   714→                      </Select>
+   715→   715→                      <FormMessage />
+   716→   716→                    </FormItem>
+   717→   717→                  )}
+   718→   718→                />
+   719→   719→              </div>
+   720→   720→              <p className="text-xs text-muted-foreground">
+   721→   721→                Comisión adicional fija que se suma (ej. comisión de red USDT, fee bancario). Se aplica
+   722→   722→                tanto a compras como a ventas. No recibe descuento VIP/BNB.
+   723→   723→              </p>
+   724→   724→            </div>
+   725→   725→
+   726→   726→            <FormField
+   727→   727→              control={form.control}
+   728→   728→              name="color"
+   729→   729→              render={({ field }) => (
+   730→   730→                <FormItem>
+   731→   731→                  <FormLabel>Color identificador</FormLabel>
+   732→   732→                  <div className="flex flex-wrap gap-2">
+   733→   733→                    {COLORS.map((c) => (
+   734→   734→                      <button
+   735→   735→                        key={c.value}
+   736→   736→                        type="button"
+   737→   737→                        title={c.name}
+   738→   738→                        onClick={() => field.onChange(c.value)}
+   739→   739→                        className={`w-8 h-8 rounded-full border-2 transition ${
+   740→   740→                          field.value === c.value
+   741→   741→                            ? 'border-foreground scale-110'
+   742→   742→                            : 'border-transparent'
+   743→   743→                        }`}
+   744→   744→                        style={{ backgroundColor: c.value }}
+   745→   745→                      />
+   746→   746→                    ))}
+   747→   747→                  </div>
+   748→   748→                  <FormMessage />
+   749→   749→                </FormItem>
+   750→   750→              )}
+   751→   751→            />
+   752→   752→
+   753→   753→            <FormField
+   754→   754→              control={form.control}
+   755→   755→              name="notes"
+   756→   756→              render={({ field }) => (
+   757→   757→                <FormItem>
+   758→   758→                  <FormLabel>Notas</FormLabel>
+   759→   759→                  <FormControl>
+   760→   760→                    <Textarea
+   761→   761→                      placeholder="Detalles del esquema de comisiones, descuentos por VIP, etc."
+   762→   762→                      rows={2}
+   763→   763→                      {...field}
+   764→   764→                    />
+   765→   765→                  </FormControl>
+   766→   766→                  <FormMessage />
+   767→   767→                </FormItem>
+   768→   768→              )}
+   769→   769→            />
+   770→   770→
+   771→   771→            <DialogFooter>
+   772→   772→              <Button
+   773→   773→                type="button"
+   774→   774→                variant="outline"
+   775→   775→                onClick={() => onOpenChange(false)}
+   776→   776→                disabled={submitting}
+   777→   777→              >
+   778→   778→                Cancelar
+   779→   779→              </Button>
+   780→   780→              <Button type="submit" disabled={submitting}>
+   781→   781→                {submitting && (
+   782→   782→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+   783→   783→                )}
+   784→   784→                {exchange ? 'Guardar cambios' : 'Crear exchange'}
+   785→   785→              </Button>
+   786→   786→            </DialogFooter>
+   787→   787→          </form>
+   788→   788→        </Form>
+   789→   789→      </DialogContent>
+   790→   790→    </Dialog>
+   791→   791→  )
+   792→   792→}
+   793→   793→

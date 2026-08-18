@@ -1,0 +1,1122 @@
+     1→'use client'
+     2→
+     3→import { useState, useMemo } from 'react'
+     4→import { useQuery, useQueryClient } from '@tanstack/react-query'
+     5→import {
+     6→  Card,
+     7→  CardContent,
+     8→  CardDescription,
+     9→  CardHeader,
+    10→  CardTitle,
+    11→} from '@/components/ui/card'
+    12→import { Button } from '@/components/ui/button'
+    13→import { Input } from '@/components/ui/input'
+    14→import {
+    15→  Select,
+    16→  SelectContent,
+    17→  SelectItem,
+    18→  SelectTrigger,
+    19→  SelectValue,
+    20→} from '@/components/ui/select'
+    21→import {
+    22→  Table,
+    23→  TableBody,
+    24→  TableCell,
+    25→  TableHead,
+    26→  TableHeader,
+    27→  TableRow,
+    28→} from '@/components/ui/table'
+    29→import {
+    30→  AlertDialog,
+    31→  AlertDialogAction,
+    32→  AlertDialogCancel,
+    33→  AlertDialogContent,
+    34→  AlertDialogDescription,
+    35→  AlertDialogFooter,
+    36→  AlertDialogHeader,
+    37→  AlertDialogTitle,
+    38→} from '@/components/ui/alert-dialog'
+    39→import {
+    40→  DropdownMenu,
+    41→  DropdownMenuContent,
+    42→  DropdownMenuItem,
+    43→  DropdownMenuTrigger,
+    44→} from '@/components/ui/dropdown-menu'
+    45→import {
+    46→  Plus,
+    47→  Pencil,
+    48→  Trash2,
+    49→  Search,
+    50→  ShoppingCart,
+    51→  Tag,
+    52→  AlertCircle,
+    53→  Filter,
+    54→  Inbox,
+    55→  Building2,
+    56→  Calendar,
+    57→  TrendingUp,
+    58→  TrendingDown,
+    59→  Image as ImageIcon,
+    60→  Download,
+    61→  FileText,
+    62→  FileSpreadsheet,
+    63→  ChevronDown,
+    64→} from 'lucide-react'
+    65→import type {
+    66→  Bank,
+    67→  Exchange,
+    68→  Transaction,
+    69→  TransactionType,
+    70→  TransactionStatus,
+    71→} from '@/lib/types'
+    72→import { TransactionForm } from './TransactionForm'
+    73→import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
+    74→import { toast } from '@/hooks/use-toast'
+    75→import { Badge } from '@/components/ui/badge'
+    76→import * as storage from '@/lib/storage'
+    77→
+    78→const STATUS_LABELS: Record<TransactionStatus, string> = {
+    79→  completada: 'Completada',
+    80→  pendiente: 'Pendiente',
+    81→  cancelada: 'Cancelada',
+    82→}
+    83→
+    84→const STATUS_COLORS: Record<TransactionStatus, string> = {
+    85→  completada: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    86→  pendiente: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    87→  cancelada: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+    88→}
+    89→
+    90→function formatMonthLabel(monthKey: string): string {
+    91→  const [year, month] = monthKey.split('-')
+    92→  const monthNames = [
+    93→    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    94→    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    95→  ]
+    96→  return `${monthNames[parseInt(month) - 1]} ${year}`
+    97→}
+    98→
+    99→// Helper: detectar si estamos en Capacitor (Android/iOS)
+   100→function isCapacitorNative(): boolean {
+   101→  return typeof window !== 'undefined' && !!(window as unknown as { Capacitor?: unknown }).Capacitor?.isNativePlatform?.() || !!(window as unknown as { Capacitor?: { platform?: string } }).Capacitor?.platform
+   102→}
+   103→
+   104→// Helper: guardar archivo preguntando al usuario dónde guardar
+   105→// En Android (Capacitor): guarda en Downloads y ofrece compartir
+   106→// En Chrome/Edge desktop: diálogo nativo "Guardar como"
+   107→// Fallback: descarga automática
+   108→async function saveFile(blob: Blob, defaultName: string, description: string): Promise<boolean> {
+   109→  // 1) Capacitor nativo (Android/iOS)
+   110→  if (isCapacitorNative()) {
+   111→    try {
+   112→      const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
+   113→      const { Share } = await import('@capacitor/share')
+   114→
+   115→      // Convertir blob a base64
+   116→      const base64 = await new Promise<string>((resolve) => {
+   117→        const reader = new FileReader()
+   118→        reader.onloadend = () => {
+   119→          const dataUrl = reader.result as string
+   120→          resolve(dataUrl.split(',')[1])
+   121→        }
+   122→        reader.readAsDataURL(blob)
+   123→      })
+   124→
+   125→      // Guardar en la carpeta Downloads del dispositivo
+   126→      const result = await Filesystem.writeFile({
+   127→        path: `Download/${defaultName}`,
+   128→        data: base64,
+   129→        directory: Directory.ExternalStorage,
+   130→        encoding: Encoding.Base64,
+   131→        recursive: true,
+   132→      })
+   133→
+   134→      // Ofrecer compartir el archivo (el usuario puede elegir "Guardar en..." o enviarlo)
+   135→      const canShare = await Share.canShare()
+   136→      if (canShare.value) {
+   137→        await Share.share({
+   138→          title: defaultName,
+   139→          text: description,
+   140→          url: result.uri,
+   141→        })
+   142→      }
+   143→
+   144→      return true
+   145→    } catch (err) {
+   146→      // Si share fue cancelado por el usuario, no es error
+   147→      if (err instanceof Error && err.message?.includes('cancel')) return true
+   148→      // Si filesystem falla (permisos), fallback a descarga web
+   149→      console.warn('Capacitor save failed, falling back:', err)
+   150→    }
+   151→  }
+   152→
+   153→  // 2) showSaveFilePicker (Chrome, Edge, Opera desktop)
+   154→  if ('showSaveFilePicker' in window) {
+   155→    try {
+   156→      const ext = defaultName.split('.').pop() ?? 'txt'
+   157→      const mimeMap: Record<string, string> = {
+   158→        csv: 'text/csv',
+   159→        pdf: 'application/pdf',
+   160→      }
+   161→      const handle = await (window as unknown as { showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
+   162→        suggestedName: defaultName,
+   163→        types: [{
+   164→          description: description,
+   165→          accept: { [mimeMap[ext] ?? 'application/octet-stream']: [`.${ext}`] },
+   166→        }],
+   167→      })
+   168→      const writable = await handle.createWritable()
+   169→      await writable.write(blob)
+   170→      await writable.close()
+   171→      return true
+   172→    } catch (err) {
+   173→      if (err instanceof Error && err.name === 'AbortError') return false
+   174→    }
+   175→  }
+   176→
+   177→  // 3) Fallback: descarga automática (Firefox, Safari, WebView sin Capacitor)
+   178→  const url = URL.createObjectURL(blob)
+   179→  const a = document.createElement('a')
+   180→  a.href = url
+   181→  a.download = defaultName
+   182→  document.body.appendChild(a)
+   183→  a.click()
+   184→  document.body.removeChild(a)
+   185→  URL.revokeObjectURL(url)
+   186→  return true
+   187→}
+   188→
+   189→// Exportar transacciones a CSV
+   190→async function exportCSV(transactions: Transaction[], filename: string) {
+   191→  const headers = ['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total Bruto', 'Moneda', 'Comisión', 'Total Neto', 'Exchange', 'Banco Origen', 'Banco Destino', 'Referencia', 'Estado', 'Notas']
+   192→  const rows = transactions.map((t) => [
+   193→    t.type === 'compra' ? 'Compra' : 'Venta',
+   194→    formatDate(t.date),
+   195→    t.counterparty,
+   196→    t.asset,
+   197→    t.amount.toString(),
+   198→    t.rate.toString(),
+   199→    t.total.toString(),
+   200→    t.currency,
+   201→    t.fee.toString(),
+   202→    (t.netTotal ?? t.total - t.fee).toString(),
+   203→    t.exchange?.name ?? '',
+   204→    t.fromBank?.name ?? '',
+   205→    t.toBank?.name ?? '',
+   206→    t.reference ?? '',
+   207→    STATUS_LABELS[t.status],
+   208→    (t.notes ?? '').replace(/"/g, '""'),
+   209→  ])
+   210→  const csvContent = [headers, ...rows]
+   211→    .map((row) => row.map((cell) => `"${cell}"`).join(','))
+   212→    .join('\n')
+   213→  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+   214→  const saved = await saveFile(blob, `${filename}.csv`, 'Archivo CSV')
+   215→  if (saved) {
+   216→    toast({ title: 'CSV exportado', description: `${transactions.length} transacciones exportadas a CSV.` })
+   217→  }
+   218→}
+   219→
+   220→// Exportar transacciones a PDF profesional con jsPDF
+   221→async function exportPDF(transactions: Transaction[], filename: string) {
+   222→  try {
+   223→    const { jsPDF } = await import('jspdf')
+   224→    const autoTable = (await import('jspdf-autotable')).default
+   225→
+   226→    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+   227→
+   228→    // Título
+   229→    doc.setFontSize(18)
+   230→    doc.setTextColor(30, 41, 59)
+   231→    doc.text('P2P Ledger - Reporte de Transacciones', 14, 18)
+   232→
+   233→    // Subtítulo
+   234→    doc.setFontSize(10)
+   235→    doc.setTextColor(100, 116, 139)
+   236→    doc.text(`Generado: ${formatDate(new Date(), true)}`, 14, 25)
+   237→    doc.text(`Total: ${transactions.length} operaciones`, 14, 30)
+   238→
+   239→    // Resumen financiero
+   240→    const compras = transactions.filter((t) => t.type === 'compra')
+   241→    const ventas = transactions.filter((t) => t.type === 'venta')
+   242→    const totalCompras = compras.reduce((s, t) => s + t.total, 0)
+   243→    const totalVentas = ventas.reduce((s, t) => s + t.total, 0)
+   244→    const totalComisiones = transactions.reduce((s, t) => s + t.fee, 0)
+   245→
+   246→    doc.setFontSize(9)
+   247→    doc.setTextColor(30, 41, 59)
+   248→    const summaryY = 36
+   249→    doc.text(`Compras: ${compras.length} ops | Total: ${formatCurrency(totalCompras, transactions[0]?.currency ?? 'VES')}`, 14, summaryY)
+   250→    doc.text(`Ventas: ${ventas.length} ops | Total: ${formatCurrency(totalVentas, transactions[0]?.currency ?? 'VES')}`, 14, summaryY + 5)
+   251→    doc.text(`Comisiones totales: ${formatCurrency(totalComisiones, transactions[0]?.currency ?? 'VES')}`, 14, summaryY + 10)
+   252→
+   253→    // Tabla de transacciones
+   254→    const tableHeaders = [['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total', 'Comisión', 'Neto', 'Exchange', 'Estado']]
+   255→    const tableRows = transactions.map((t) => [
+   256→      t.type === 'compra' ? 'Compra' : 'Venta',
+   257→      formatDate(t.date),
+   258→      t.counterparty,
+   259→      t.asset,
+   260→      formatNumber(t.amount, 2),
+   261→      formatNumber(t.rate, 2),
+   262→      formatCurrency(t.total, t.currency),
+   263→      formatCurrency(t.fee, t.currency),
+   264→      formatCurrency(t.netTotal ?? t.total - t.fee, t.currency),
+   265→      t.exchange?.shortName ?? t.exchange?.name ?? '-',
+   266→      STATUS_LABELS[t.status],
+   267→    ])
+   268→
+   269→    autoTable(doc, {
+   270→      head: tableHeaders,
+   271→      body: tableRows,
+   272→      startY: summaryY + 16,
+   273→      theme: 'grid',
+   274→      styles: {
+   275→        fontSize: 7,
+   276→        cellPadding: 2,
+   277→        textColor: [30, 41, 59],
+   278→        lineWidth: 0.1,
+   279→        lineColor: [203, 213, 225],
+   280→      },
+   281→      headStyles: {
+   282→        fillColor: [99, 102, 241],
+   283→        textColor: [255, 255, 255],
+   284→        fontStyle: 'bold',
+   285→        fontSize: 7.5,
+   286→      },
+   287→      alternateRowStyles: {
+   288→        fillColor: [248, 250, 252],
+   289→      },
+   290→      columnStyles: {
+   291→        0: { cellWidth: 18 },
+   292→        1: { cellWidth: 24 },
+   293→        4: { halign: 'right' },
+   294→        5: { halign: 'right' },
+   295→        6: { halign: 'right' },
+   296→        7: { halign: 'right' },
+   297→        8: { halign: 'right' },
+   298→      },
+   299→      didParseCell: (data) => {
+   300→        // Colorear tipo de transacción
+   301→        if (data.column.index === 0 && data.section === 'body') {
+   302→          const val = data.cell.raw as string
+   303→          if (val === 'Compra') {
+   304→            data.cell.styles.textColor = [16, 185, 129]
+   305→            data.cell.styles.fontStyle = 'bold'
+   306→          } else if (val === 'Venta') {
+   307→            data.cell.styles.textColor = [244, 63, 94]
+   308→            data.cell.styles.fontStyle = 'bold'
+   309→          }
+   310→        }
+   311→      },
+   312→    })
+   313→
+   314→    // Pie de página
+   315→    const pageCount = doc.getNumberOfPages()
+   316→    for (let i = 1; i <= pageCount; i++) {
+   317→      doc.setPage(i)
+   318→      doc.setFontSize(8)
+   319→      doc.setTextColor(148, 163, 184)
+   320→      doc.text(`P2P Ledger v1.0 - Página ${i} de ${pageCount}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' })
+   321→    }
+   322→
+   323→    // Generar blob del PDF y guardar preguntando dónde
+   324→    const pdfBlob = doc.output('blob')
+   325→    const saved = await saveFile(pdfBlob, `${filename}.pdf`, 'Archivo PDF')
+   326→    if (saved) {
+   327→      toast({ title: 'PDF exportado', description: `${transactions.length} transacciones exportadas a PDF.` })
+   328→    }
+   329→  } catch (error) {
+   330→    console.error('Error generando PDF:', error)
+   331→    toast({ title: 'Error al exportar PDF', description: 'No se pudo generar el archivo PDF.', variant: 'destructive' })
+   332→  }
+   333→}
+   334→
+   335→// Sub-componente: card mobile para una transacción
+   336→function TransactionCardMobile({
+   337→  t,
+   338→  onEdit,
+   339→  onDelete,
+   340→}: {
+   341→  t: Transaction
+   342→  onEdit: (t: Transaction) => void
+   343→  onDelete: (t: Transaction) => void
+   344→}) {
+   345→  return (
+   346→    <div className="p-2.5 space-y-1.5">
+   347→      <div className="flex items-center justify-between gap-2">
+   348→        <div className="flex items-center gap-1.5 min-w-0">
+   349→          <Badge
+   350→            variant="outline"
+   351→            className={
+   352→              t.type === 'compra'
+   353→                ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300 text-[9px] px-1.5 py-0'
+   354→                : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300 text-[9px] px-1.5 py-0'
+   355→            }
+   356→          >
+   357→            {t.type === 'compra' ? 'Compra' : 'Venta'}
+   358→          </Badge>
+   359→          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+   360→            {formatDate(t.date, true)}
+   361→          </span>
+   362→        </div>
+   363→        <div className="flex gap-0.5 flex-shrink-0">
+   364→          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(t)} title="Editar">
+   365→            <Pencil className="h-3 w-3" />
+   366→          </Button>
+   367→          <Button size="icon" variant="ghost" className="h-7 w-7 hover:text-rose-600" onClick={() => onDelete(t)} title="Eliminar">
+   368→            <Trash2 className="h-3 w-3" />
+   369→          </Button>
+   370→        </div>
+   371→      </div>
+   372→      <div className="flex items-center justify-between gap-2">
+   373→        <span className="font-medium text-sm truncate">{t.counterparty}</span>
+   374→        {t.exchange && (
+   375→          <span
+   376→            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] flex-shrink-0"
+   377→            style={{ backgroundColor: `${t.exchange.color}22` }}
+   378→            title={t.exchange.name}
+   379→          >
+   380→            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.exchange.color }} />
+   381→            {t.exchange.shortName ?? t.exchange.name}
+   382→          </span>
+   383→        )}
+   384→      </div>
+   385→      {t.reference && (
+   386→        <p className="text-[10px] text-muted-foreground font-mono truncate">Ref: {t.reference}</p>
+   387→      )}
+   388→      {t.captureUrl && (
+   389→        <div className="mt-1">
+   390→          <img
+   391→            src={t.captureUrl}
+   392→            alt="Comprobante"
+   393→            className="h-16 w-auto rounded border object-cover"
+   394→          />
+   395→        </div>
+   396→      )}
+   397→      <div className="flex items-center justify-between text-xs">
+   398→        <span className="tabular-nums">
+   399→          {formatNumber(t.amount, 2)} <span className="text-muted-foreground">{t.asset}</span>
+   400→        </span>
+   401→        <span className="tabular-nums text-muted-foreground">@{formatNumber(t.rate, 2)}</span>
+   402→      </div>
+   403→      <div className="flex items-center justify-between text-xs">
+   404→        <span className="text-muted-foreground">Bruto</span>
+   405→        <span className="font-medium tabular-nums">{formatCurrency(t.total, t.currency)}</span>
+   406→      </div>
+   407→      {t.fee > 0 && (
+   408→        <div className="flex items-center justify-between text-xs">
+   409→          <span className="text-muted-foreground">Comisión</span>
+   410→          <span className="text-amber-600 dark:text-amber-400 tabular-nums">
+   411→            −{formatCurrency(t.fee, t.currency)}
+   412→          </span>
+   413→        </div>
+   414→      )}
+   415→      <div className="flex items-center justify-between text-xs">
+   416→        <span className="text-muted-foreground">Neto</span>
+   417→        <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+   418→          {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+   419→        </span>
+   420→      </div>
+   421→      <div className="flex items-center justify-between gap-2 pt-0.5">
+   422→        <div className="flex items-center gap-1 text-[10px] min-w-0">
+   423→          {t.fromBank && (
+   424→            <span
+   425→              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded truncate"
+   426→              style={{ backgroundColor: `${t.fromBank.color}22` }}
+   427→              title={`Origen: ${t.fromBank.name}`}
+   428→            >
+   429→              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.fromBank.color }} />
+   430→              <span className="truncate">{t.fromBank.name}</span>
+   431→            </span>
+   432→          )}
+   433→          {t.toBank && (
+   434→            <>
+   435→              <span className="text-muted-foreground flex-shrink-0">→</span>
+   436→              <span
+   437→                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded truncate"
+   438→                style={{ backgroundColor: `${t.toBank.color}22` }}
+   439→                title={`Destino: ${t.toBank.name}`}
+   440→              >
+   441→                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.toBank.color }} />
+   442→                <span className="truncate">{t.toBank.name}</span>
+   443→              </span>
+   444→            </>
+   445→          )}
+   446→          {!t.fromBank && !t.toBank && (
+   447→            <span className="text-muted-foreground">Sin bancos</span>
+   448→          )}
+   449→        </div>
+   450→        <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] flex-shrink-0 ${STATUS_COLORS[t.status]}`}>
+   451→          {STATUS_LABELS[t.status]}
+   452→        </span>
+   453→      </div>
+   454→    </div>
+   455→  )
+   456→}
+   457→
+   458→// Sub-componente: fila desktop para una transacción
+   459→function TransactionRowDesktop({
+   460→  t,
+   461→  onEdit,
+   462→  onDelete,
+   463→}: {
+   464→  t: Transaction
+   465→  onEdit: (t: Transaction) => void
+   466→  onDelete: (t: Transaction) => void
+   467→}) {
+   468→  return (
+   469→    <TableRow className="hover:bg-muted/40">
+   470→      <TableCell>
+   471→        <Badge
+   472→          variant="outline"
+   473→          className={
+   474→            t.type === 'compra'
+   475→              ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300'
+   476→              : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300'
+   477→          }
+   478→        >
+   479→          {t.type === 'compra' ? 'Compra' : 'Venta'}
+   480→        </Badge>
+   481→      </TableCell>
+   482→      <TableCell className="text-xs whitespace-nowrap">{formatDate(t.date, true)}</TableCell>
+   483→      <TableCell>
+   484→        <div className="font-medium truncate max-w-[180px]">{t.counterparty}</div>
+   485→        {t.reference && (
+   486→          <div className="text-xs text-muted-foreground font-mono">Ref: {t.reference}</div>
+   487→        )}
+   488→      </TableCell>
+   489→      <TableCell>
+   490→        {t.exchange ? (
+   491→          <span
+   492→            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+   493→            style={{ backgroundColor: `${t.exchange.color}22` }}
+   494→            title={t.exchange.name}
+   495→          >
+   496→            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.exchange.color }} />
+   497→            {t.exchange.shortName ?? t.exchange.name}
+   498→          </span>
+   499→        ) : (
+   500→          <span className="text-xs text-muted-foreground">—</span>
+   501→        )}
+   502→      </TableCell>
+   503→      <TableCell className="text-right tabular-nums whitespace-nowrap">
+   504→        <div className="font-medium">
+   505→          {formatNumber(t.amount, 2)}{' '}
+   506→          <span className="text-xs text-muted-foreground">{t.asset}</span>
+   507→        </div>
+   508→      </TableCell>
+   509→      <TableCell className="text-right tabular-nums text-sm">{formatNumber(t.rate, 2)}</TableCell>
+   510→      <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
+   511→        {formatCurrency(t.total, t.currency)}
+   512→      </TableCell>
+   513→      <TableCell className="text-right tabular-nums text-xs whitespace-nowrap">
+   514→        {t.fee > 0 ? (
+   515→          <span className="text-amber-600 dark:text-amber-400">−{formatCurrency(t.fee, t.currency)}</span>
+   516→        ) : (
+   517→          <span className="text-muted-foreground">—</span>
+   518→        )}
+   519→      </TableCell>
+   520→      <TableCell className="text-right tabular-nums font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+   521→        {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+   522→      </TableCell>
+   523→      <TableCell>
+   524→        <div className="flex items-center gap-1 text-xs">
+   525→          {t.fromBank ? (
+   526→            <span
+   527→              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+   528→              style={{ backgroundColor: `${t.fromBank.color}22` }}
+   529→              title={`Origen: ${t.fromBank.name}`}
+   530→            >
+   531→              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.fromBank.color }} />
+   532→              {t.fromBank.name}
+   533→            </span>
+   534→          ) : (
+   535→            <span className="text-muted-foreground">—</span>
+   536→          )}
+   537→          {t.toBank && (
+   538→            <>
+   539→              <span className="text-muted-foreground">→</span>
+   540→              <span
+   541→                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+   542→                style={{ backgroundColor: `${t.toBank.color}22` }}
+   543→                title={`Destino: ${t.toBank.name}`}
+   544→              >
+   545→                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.toBank.color }} />
+   546→                {t.toBank.name}
+   547→              </span>
+   548→            </>
+   549→          )}
+   550→          {t.captureUrl && (
+   551→            <span className="text-blue-500" title="Tiene comprobante adjunto">
+   552→              <ImageIcon className="h-3.5 w-3.5" />
+   553→            </span>
+   554→          )}
+   555→        </div>
+   556→      </TableCell>
+   557→      <TableCell>
+   558→        <span className={`inline-block px-2 py-0.5 rounded text-xs ${STATUS_COLORS[t.status]}`}>
+   559→          {STATUS_LABELS[t.status]}
+   560→        </span>
+   561→      </TableCell>
+   562→      <TableCell>
+   563→        <div className="flex gap-0.5">
+   564→          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(t)} title="Editar">
+   565→            <Pencil className="h-3.5 w-3.5" />
+   566→          </Button>
+   567→          <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-rose-600" onClick={() => onDelete(t)} title="Eliminar">
+   568→            <Trash2 className="h-3.5 w-3.5" />
+   569→          </Button>
+   570→        </div>
+   571→      </TableCell>
+   572→    </TableRow>
+   573→  )
+   574→}
+   575→
+   576→// Tabla desktop compartida
+   577→function TransactionTable({
+   578→  transactions,
+   579→  onEdit,
+   580→  onDelete,
+   581→  footerRow,
+   582→}: {
+   583→  transactions: Transaction[]
+   584→  onEdit: (t: Transaction) => void
+   585→  onDelete: (t: Transaction) => void
+   586→  footerRow?: React.ReactNode
+   587→}) {
+   588→  return (
+   589→    <div className="hidden sm:block overflow-x-auto">
+   590→      <Table>
+   591→        <TableHeader>
+   592→          <TableRow>
+   593→            <TableHead className="w-[100px]">Tipo</TableHead>
+   594→            <TableHead>Fecha</TableHead>
+   595→            <TableHead>Contraparte</TableHead>
+   596→            <TableHead>Exchange</TableHead>
+   597→            <TableHead className="text-right">Activo</TableHead>
+   598→            <TableHead className="text-right">Tasa</TableHead>
+   599→            <TableHead className="text-right">Bruto</TableHead>
+   600→            <TableHead className="text-right">Comisión</TableHead>
+   601→            <TableHead className="text-right">Neto</TableHead>
+   602→            <TableHead>Bancos</TableHead>
+   603→            <TableHead>Estado</TableHead>
+   604→            <TableHead className="w-[80px]"></TableHead>
+   605→          </TableRow>
+   606→        </TableHeader>
+   607→        <TableBody>
+   608→          {transactions.map((t) => (
+   609→            <TransactionRowDesktop key={t.id} t={t} onEdit={onEdit} onDelete={onDelete} />
+   610→          ))}
+   611→          {footerRow}
+   612→        </TableBody>
+   613→      </Table>
+   614→    </div>
+   615→  )
+   616→}
+   617→
+   618→interface TransactionsViewProps {
+   619→  mode: 'compra' | 'venta' | 'all'
+   620→}
+   621→
+   622→interface MonthGroup {
+   623→  month: string
+   624→  label: string
+   625→  transactions: Transaction[]
+   626→  totalCompras: number
+   627→  totalVentas: number
+   628→  totalFees: number
+   629→  totalNeto: number
+   630→  tasaPromCompras: number
+   631→  tasaPromVentas: number
+   632→  countCompras: number
+   633→  countVentas: number
+   634→}
+   635→
+   636→export function TransactionsView({ mode }: TransactionsViewProps) {
+   637→  const queryClient = useQueryClient()
+   638→  const [search, setSearch] = useState('')
+   639→  const [statusFilter, setStatusFilter] = useState<string>('all')
+   640→  const [bankFilter, setBankFilter] = useState<string>('all')
+   641→  const [exchangeFilter, setExchangeFilter] = useState<string>('all')
+   642→  const [formOpen, setFormOpen] = useState(false)
+   643→  const [editing, setEditing] = useState<Transaction | null>(null)
+   644→  const [deleting, setDeleting] = useState<Transaction | null>(null)
+   645→
+   646→  // Cargar bancos y exchanges
+   647→  const { data: banks = [] } = useQuery<Bank[]>({
+   648→    queryKey: ['banks'],
+   649→    queryFn: () => storage.listBanks(),
+   650→  })
+   651→
+   652→  const { data: exchanges = [] } = useQuery<Exchange[]>({
+   653→    queryKey: ['exchanges'],
+   654→    queryFn: () => storage.listExchanges(),
+   655→  })
+   656→
+   657→  const filters = useMemo(
+   658→    () => ({
+   659→      type: mode !== 'all' ? (mode as TransactionType) : undefined,
+   660→      status: statusFilter !== 'all' ? (statusFilter as TransactionStatus) : undefined,
+   661→      bankId: bankFilter !== 'all' ? bankFilter : undefined,
+   662→      exchangeId: exchangeFilter !== 'all' ? exchangeFilter : undefined,
+   663→    }),
+   664→    [mode, statusFilter, bankFilter, exchangeFilter]
+   665→  )
+   666→
+   667→  const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
+   668→    queryKey: ['transactions', filters],
+   669→    queryFn: () => storage.listTransactions(filters),
+   670→  })
+   671→
+   672→  const filtered = transactions.filter((t) => {
+   673→    const q = search.toLowerCase().trim()
+   674→    if (!q) return true
+   675→    return (
+   676→      t.counterparty.toLowerCase().includes(q) ||
+   677→      t.asset.toLowerCase().includes(q) ||
+   678→      (t.reference ?? '').toLowerCase().includes(q) ||
+   679→      (t.notes ?? '').toLowerCase().includes(q)
+   680→    )
+   681→  })
+   682→
+   683→  // KPIs globales
+   684→  const completadas = filtered.filter((t) => t.status === 'completada')
+   685→  const totalMonto = completadas.reduce((s, t) => s + t.amount, 0)
+   686→  const totalFiat = completadas.reduce((s, t) => s + t.total, 0)
+   687→  const totalFees = completadas.reduce((s, t) => s + t.fee, 0)
+   688→  const totalNeto = completadas.reduce((s, t) => s + (t.netTotal ?? t.total - t.fee), 0)
+   689→  const tasaPromedio = totalMonto > 0 ? totalFiat / totalMonto : 0
+   690→
+   691→  // Agrupar transacciones por mes (solo en modo "all" / Historial)
+   692→  const groupedByMonth = useMemo((): MonthGroup[] | null => {
+   693→    if (mode !== 'all') return null
+   694→    const groups: Record<string, Transaction[]> = {}
+   695→    for (const t of filtered) {
+   696→      const d = new Date(t.date)
+   697→      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+   698→      if (!groups[key]) groups[key] = []
+   699→      groups[key].push(t)
+   700→    }
+   701→    const sorted = Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
+   702→    return sorted.map(([month, txs]) => {
+   703→      const completadasMes = txs.filter((t) => t.status === 'completada')
+   704→      const compras = completadasMes.filter((t) => t.type === 'compra')
+   705→      const ventas = completadasMes.filter((t) => t.type === 'venta')
+   706→      const totalCompras = compras.reduce((s, t) => s + t.total, 0)
+   707→      const totalVentas = ventas.reduce((s, t) => s + t.total, 0)
+   708→      const totalFeesMes = completadasMes.reduce((s, t) => s + t.fee, 0)
+   709→      const totalNetoMes = completadasMes.reduce((s, t) => s + (t.netTotal ?? t.total - t.fee), 0)
+   710→      const montoCompras = compras.reduce((s, t) => s + t.amount, 0)
+   711→      const montoVentas = ventas.reduce((s, t) => s + t.amount, 0)
+   712→      return {
+   713→        month,
+   714→        label: formatMonthLabel(month),
+   715→        transactions: txs,
+   716→        totalCompras,
+   717→        totalVentas,
+   718→        totalFees: totalFeesMes,
+   719→        totalNeto: totalNetoMes,
+   720→        tasaPromCompras: montoCompras > 0 ? totalCompras / montoCompras : 0,
+   721→        tasaPromVentas: montoVentas > 0 ? totalVentas / montoVentas : 0,
+   722→        countCompras: compras.length,
+   723→        countVentas: ventas.length,
+   724→      }
+   725→    })
+   726→  }, [filtered, mode])
+   727→
+   728→  async function refetch() {
+   729→    await queryClient.invalidateQueries({ queryKey: ['transactions'] })
+   730→    await queryClient.invalidateQueries({ queryKey: ['banks'] })
+   731→    await queryClient.invalidateQueries({ queryKey: ['exchanges'] })
+   732→    await queryClient.invalidateQueries({ queryKey: ['stats'] })
+   733→  }
+   734→
+   735→  function openNew() {
+   736→    setEditing(null)
+   737→    setFormOpen(true)
+   738→  }
+   739→
+   740→  function openEdit(t: Transaction) {
+   741→    setEditing(t)
+   742→    setFormOpen(true)
+   743→  }
+   744→
+   745→  async function confirmDelete() {
+   746→    if (!deleting) return
+   747→    try {
+   748→      await storage.deleteTransaction(deleting.id)
+   749→      toast({
+   750→        title: 'Transacción eliminada',
+   751→        description: `Operación con ${deleting.counterparty} fue eliminada.`,
+   752→      })
+   753→      await refetch()
+   754→    } catch (e) {
+   755→      toast({
+   756→        title: 'Error',
+   757→        description: e instanceof Error ? e.message : 'Error desconocido',
+   758→        variant: 'destructive',
+   759→      })
+   760→    } finally {
+   761→      setDeleting(null)
+   762→    }
+   763→  }
+   764→
+   765→  const title =
+   766→    mode === 'compra'
+   767→      ? 'Compras P2P'
+   768→      : mode === 'venta'
+   769→        ? 'Ventas P2P'
+   770→        : 'Historial por mes'
+   771→
+   772→  const description =
+   773→    mode === 'compra'
+   774→      ? 'Operaciones donde recibiste un activo a cambio de moneda fiat.'
+   775→      : mode === 'venta'
+   776→        ? 'Operaciones donde entregaste un activo a cambio de moneda fiat.'
+   777→        : 'Historial completo agrupado por mes con resumen de movimientos.'
+   778→
+   779→  const defaultType: TransactionType = mode === 'venta' ? 'venta' : 'compra'
+   780→
+   781→  const isEmptyState = !isLoading && filtered.length === 0
+   782→  const emptyMessage =
+   783→    search || statusFilter !== 'all' || bankFilter !== 'all' || exchangeFilter !== 'all'
+   784→      ? 'No se encontraron resultados con los filtros actuales.'
+   785→      : mode === 'venta'
+   786→        ? 'Registra tu primera venta para empezar a llevar el control.'
+   787→        : mode === 'compra'
+   788→          ? 'Registra tu primera compra para empezar a llevar el control.'
+   789→          : 'Registra tu primera operación para empezar a llevar el control.'
+   790→  const emptyButtonLabel =
+   791→    mode === 'venta' ? 'Registrar venta' : mode === 'compra' ? 'Registrar compra' : 'Registrar operación'
+   792→  const noFilters = !search && statusFilter === 'all' && bankFilter === 'all' && exchangeFilter === 'all'
+   793→
+   794→  return (
+   795→    <div className="space-y-2.5 sm:space-y-4">
+   796→      {/* KPIs */}
+   797→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+   798→        <Card className="p-0">
+   799→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   800→            <CardDescription className="text-[9px] sm:text-xs">Operaciones</CardDescription>
+   801→            <CardTitle className="text-sm sm:text-2xl tabular-nums leading-tight">{filtered.length}</CardTitle>
+   802→          </CardHeader>
+   803→        </Card>
+   804→        <Card className="p-0">
+   805→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   806→            <CardDescription className="text-[9px] sm:text-xs">Volumen bruto</CardDescription>
+   807→            <CardTitle className="text-sm sm:text-2xl tabular-nums leading-tight">{formatCurrency(totalFiat)}</CardTitle>
+   808→          </CardHeader>
+   809→        </Card>
+   810→        <Card className="p-0">
+   811→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   812→            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   813→              <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" /> Comisiones
+   814→            </CardDescription>
+   815→            <CardTitle className="text-sm sm:text-2xl tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
+   816→              {formatCurrency(totalFees)}
+   817→            </CardTitle>
+   818→          </CardHeader>
+   819→        </Card>
+   820→        <Card className="p-0">
+   821→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   822→            <CardDescription className="text-[9px] sm:text-xs">Volumen neto</CardDescription>
+   823→            <CardTitle className="text-sm sm:text-2xl tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
+   824→              {formatCurrency(totalNeto)}
+   825→            </CardTitle>
+   826→          </CardHeader>
+   827→        </Card>
+   828→      </div>
+   829→
+   830→      {/* Header con acciones */}
+   831→      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
+   832→        <div>
+   833→          <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2">
+   834→            {mode === 'compra' && <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />}
+   835→            {mode === 'venta' && <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500" />}
+   836→            {title}
+   837→          </h2>
+   838→          <p className="text-[11px] sm:text-sm text-muted-foreground">{description}</p>
+   839→        </div>
+   840→        <Button onClick={openNew} size="sm" className="self-start">
+   841→          <Plus className="mr-1 h-4 w-4" />
+   842→          {mode === 'venta' ? 'Nueva venta' : 'Nueva compra'}
+   843→        </Button>
+   844→        {filtered.length > 0 && (
+   845→          <DropdownMenu>
+   846→            <DropdownMenuTrigger asChild>
+   847→              <Button variant="outline" size="sm" className="self-start">
+   848→                <Download className="mr-1 h-3.5 w-3.5" />
+   849→                Exportar
+   850→                <ChevronDown className="ml-1 h-3 w-3" />
+   851→              </Button>
+   852→            </DropdownMenuTrigger>
+   853→            <DropdownMenuContent align="end">
+   854→              <DropdownMenuItem
+   855→                onClick={() => exportCSV(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
+   856→              >
+   857→                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+   858→                <div>
+   859→                  <div className="font-medium">Exportar CSV</div>
+   860→                  <div className="text-xs text-muted-foreground">Datos en formato tabla para Excel</div>
+   861→                </div>
+   862→              </DropdownMenuItem>
+   863→              <DropdownMenuItem
+   864→                onClick={() => exportPDF(filtered, `p2p-ledger-${mode}-${new Date().toISOString().slice(0, 10)}`)}
+   865→              >
+   866→                <FileText className="mr-2 h-4 w-4 text-indigo-600" />
+   867→                <div>
+   868→                  <div className="font-medium">Exportar PDF</div>
+   869→                  <div className="text-xs text-muted-foreground">Reporte profesional con resumen</div>
+   870→                </div>
+   871→              </DropdownMenuItem>
+   872→            </DropdownMenuContent>
+   873→          </DropdownMenu>
+   874→        )}
+   875→      </div>
+   876→
+   877→      {/* Filtros */}
+   878→      <div className="grid grid-cols-2 sm:flex sm:flex-row gap-1.5 sm:gap-2">
+   879→        <div className="relative col-span-2 sm:flex-1">
+   880→          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+   881→          <Input
+   882→            placeholder="Buscar contraparte, activo..."
+   883→            value={search}
+   884→            onChange={(e) => setSearch(e.target.value)}
+   885→            className="pl-8 h-9 text-sm"
+   886→          />
+   887→        </div>
+   888→        <Select value={statusFilter} onValueChange={setStatusFilter}>
+   889→          <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
+   890→            <Filter className="mr-1 h-3.5 w-3.5" />
+   891→            <SelectValue placeholder="Estado" />
+   892→          </SelectTrigger>
+   893→          <SelectContent>
+   894→            <SelectItem value="all">Todos</SelectItem>
+   895→            <SelectItem value="completada">Completadas</SelectItem>
+   896→            <SelectItem value="pendiente">Pendientes</SelectItem>
+   897→            <SelectItem value="cancelada">Canceladas</SelectItem>
+   898→          </SelectContent>
+   899→        </Select>
+   900→        <Select value={bankFilter} onValueChange={setBankFilter}>
+   901→          <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
+   902→            <SelectValue placeholder="Banco" />
+   903→          </SelectTrigger>
+   904→          <SelectContent>
+   905→            <SelectItem value="all">Todos los bancos</SelectItem>
+   906→            {banks.map((b) => (
+   907→              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+   908→            ))}
+   909→          </SelectContent>
+   910→        </Select>
+   911→        <Select value={exchangeFilter} onValueChange={setExchangeFilter}>
+   912→          <SelectTrigger className="w-full sm:w-36 h-9 text-sm col-span-2 sm:col-span-1">
+   913→            <SelectValue placeholder="Exchange" />
+   914→          </SelectTrigger>
+   915→          <SelectContent>
+   916→            <SelectItem value="all">Todos</SelectItem>
+   917→            <SelectItem value="__none__">Sin exchange</SelectItem>
+   918→            {exchanges.map((e) => (
+   919→              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+   920→            ))}
+   921→          </SelectContent>
+   922→        </Select>
+   923→      </div>
+   924→
+   925→      {/* Contenido principal */}
+   926→      {mode === 'all' && groupedByMonth ? (
+   927→        /* ===== HISTORIAL AGRUPADO POR MES ===== */
+   928→        isLoading ? (
+   929→          <div className="space-y-3">
+   930→            {[...Array(3)].map((_, i) => (
+   931→              <Card key={i} className="animate-pulse">
+   932→                <div className="h-10 bg-muted/40 rounded-t-lg" />
+   933→                <div className="p-4 space-y-2">
+   934→                  <div className="h-8 bg-muted/30 rounded" />
+   935→                  <div className="h-8 bg-muted/30 rounded" />
+   936→                </div>
+   937→              </Card>
+   938→            ))}
+   939→          </div>
+   940→        ) : isEmptyState ? (
+   941→          <Card>
+   942→            <CardContent className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+   943→              <Inbox className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
+   944→              <p className="font-medium text-sm">No hay transacciones</p>
+   945→              <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-sm px-4">{emptyMessage}</p>
+   946→              {noFilters && (
+   947→                <Button onClick={openNew} size="sm" className="mt-4">
+   948→                  <Plus className="mr-1 h-4 w-4" />
+   949→                  {emptyButtonLabel}
+   950→                </Button>
+   951→              )}
+   952→            </CardContent>
+   953→          </Card>
+   954→        ) : (
+   955→          <div className="space-y-3">
+   956→            {groupedByMonth.map((group) => (
+   957→              <Card key={group.month} className="overflow-hidden">
+   958→                {/* Encabezado del mes */}
+   959→                <div className="bg-muted/50 border-b px-3 py-2 sm:px-4 sm:py-2.5">
+   960→                  <div className="flex items-center justify-between gap-2 flex-wrap">
+   961→                    <div className="flex items-center gap-2">
+   962→                      <Calendar className="h-4 w-4 text-blue-500" />
+   963→                      <h3 className="font-semibold text-sm sm:text-base">{group.label}</h3>
+   964→                      <span className="text-xs text-muted-foreground">
+   965→                        ({group.countCompras + group.countVentas} {group.countCompras + group.countVentas === 1 ? 'op.' : 'ops.'})
+   966→                      </span>
+   967→                    </div>
+   968→                    <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm flex-wrap">
+   969→                      {group.countCompras > 0 && (
+   970→                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+   971→                          <TrendingDown className="h-3 w-3" />
+   972→                          {formatCurrency(group.totalCompras)}
+   973→                        </span>
+   974→                      )}
+   975→                      {group.countVentas > 0 && (
+   976→                        <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
+   977→                          <TrendingUp className="h-3 w-3" />
+   978→                          {formatCurrency(group.totalVentas)}
+   979→                        </span>
+   980→                      )}
+   981→                      {group.totalFees > 0 && (
+   982→                        <span className="text-amber-600 dark:text-amber-400">
+   983→                          Fee: {formatCurrency(group.totalFees)}
+   984→                        </span>
+   985→                      )}
+   986→                    </div>
+   987→                  </div>
+   988→                </div>
+   989→                <CardContent className="p-0">
+   990→                  {/* MOBILE */}
+   991→                  <div className="sm:hidden divide-y">
+   992→                    {group.transactions.map((t) => (
+   993→                      <TransactionCardMobile key={t.id} t={t} onEdit={openEdit} onDelete={setDeleting} />
+   994→                    ))}
+   995→                  </div>
+   996→                  {/* DESKTOP */}
+   997→                  <TransactionTable
+   998→                    transactions={group.transactions}
+   999→                    onEdit={openEdit}
+  1000→                    onDelete={setDeleting}
+  1001→                    footerRow={
+  1002→                      <TableRow className="bg-muted/30 border-t-2 border-border font-medium">
+  1003→                        <TableCell colSpan={2} className="text-xs text-muted-foreground">
+  1004→                          Subtotal {group.label}
+  1005→                        </TableCell>
+  1006→                        <TableCell className="text-xs text-muted-foreground">
+  1007→                          {group.countCompras + group.countVentas} ops.
+  1008→                        </TableCell>
+  1009→                        <TableCell />
+  1010→                        <TableCell />
+  1011→                        <TableCell />
+  1012→                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+  1013→                          <div className="flex flex-col items-end gap-0.5">
+  1014→                            {group.countCompras > 0 && (
+  1015→                              <span className="text-emerald-600 dark:text-emerald-400 text-xs">
+  1016→                                C: {formatCurrency(group.totalCompras)}
+  1017→                              </span>
+  1018→                            )}
+  1019→                            {group.countVentas > 0 && (
+  1020→                              <span className="text-rose-600 dark:text-rose-400 text-xs">
+  1021→                                V: {formatCurrency(group.totalVentas)}
+  1022→                              </span>
+  1023→                            )}
+  1024→                          </div>
+  1025→                        </TableCell>
+  1026→                        <TableCell className="text-right tabular-nums text-xs whitespace-nowrap">
+  1027→                          {group.totalFees > 0 ? (
+  1028→                            <span className="text-amber-600 dark:text-amber-400">
+  1029→                              −{formatCurrency(group.totalFees)}
+  1030→                            </span>
+  1031→                          ) : (
+  1032→                            <span className="text-muted-foreground">—</span>
+  1033→                          )}
+  1034→                        </TableCell>
+  1035→                        <TableCell className="text-right tabular-nums whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+  1036→                          {formatCurrency(group.totalNeto)}
+  1037→                        </TableCell>
+  1038→                        <TableCell colSpan={3} />
+  1039→                      </TableRow>
+  1040→                    }
+  1041→                  />
+  1042→                </CardContent>
+  1043→              </Card>
+  1044→            ))}
+  1045→          </div>
+  1046→        )
+  1047→      ) : (
+  1048→        /* ===== MODO COMPRA / VENTA (lista plana) ===== */
+  1049→        <Card>
+  1050→          <CardContent className="p-0">
+  1051→            {isLoading ? (
+  1052→              <div className="p-4 sm:p-8 space-y-2">
+  1053→                {[...Array(4)].map((_, i) => (
+  1054→                  <div key={i} className="h-12 rounded bg-muted/40 animate-pulse" />
+  1055→                ))}
+  1056→              </div>
+  1057→            ) : isEmptyState ? (
+  1058→              <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+  1059→                <Inbox className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
+  1060→                <p className="font-medium text-sm">No hay transacciones</p>
+  1061→                <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-sm px-4">{emptyMessage}</p>
+  1062→                {noFilters && (
+  1063→                  <Button onClick={openNew} size="sm" className="mt-4">
+  1064→                    <Plus className="mr-1 h-4 w-4" />
+  1065→                    {emptyButtonLabel}
+  1066→                  </Button>
+  1067→                )}
+  1068→              </div>
+  1069→            ) : (
+  1070→              <>
+  1071→                {/* MOBILE */}
+  1072→                <div className="sm:hidden divide-y">
+  1073→                  {filtered.map((t) => (
+  1074→                    <TransactionCardMobile key={t.id} t={t} onEdit={openEdit} onDelete={setDeleting} />
+  1075→                  ))}
+  1076→                </div>
+  1077→                {/* DESKTOP */}
+  1078→                <TransactionTable
+  1079→                  transactions={filtered}
+  1080→                  onEdit={openEdit}
+  1081→                  onDelete={setDeleting}
+  1082→                />
+  1083→              </>
+  1084→            )}
+  1085→          </CardContent>
+  1086→        </Card>
+  1087→      )}
+  1088→
+  1089→      <TransactionForm
+  1090→        open={formOpen}
+  1091→        onOpenChange={setFormOpen}
+  1092→        transaction={editing}
+  1093→        defaultType={defaultType}
+  1094→        banks={banks}
+  1095→        onSaved={refetch}
+  1096→      />
+  1097→
+  1098→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+  1099→        <AlertDialogContent>
+  1100→          <AlertDialogHeader>
+  1101→            <AlertDialogTitle className="flex items-center gap-2">
+  1102→              <AlertCircle className="h-5 w-5 text-rose-500" />
+  1103→              Eliminar transacción
+  1104→            </AlertDialogTitle>
+  1105→            <AlertDialogDescription>
+  1106→              ¿Eliminar la {deleting?.type === 'compra' ? 'compra' : 'venta'} de{' '}
+  1107→              {formatNumber(deleting?.amount ?? 0)} {deleting?.asset} con{' '}
+  1108→              {deleting?.counterparty}? Esta acción no se puede deshacer.
+  1109→            </AlertDialogDescription>
+  1110→          </AlertDialogHeader>
+  1111→          <AlertDialogFooter>
+  1112→            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+  1113→            <AlertDialogAction onClick={confirmDelete} className="bg-rose-600 hover:bg-rose-700">
+  1114→              Eliminar
+  1115→            </AlertDialogAction>
+  1116→          </AlertDialogFooter>
+  1117→        </AlertDialogContent>
+  1118→      </AlertDialog>
+  1119→    </div>
+  1120→  )
+  1121→}
+  1122→

@@ -1,0 +1,662 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useMemo } from 'react'
+     4→     4→import { useQuery, useQueryClient } from '@tanstack/react-query'
+     5→     5→import {
+     6→     6→  Card,
+     7→     7→  CardContent,
+     8→     8→  CardDescription,
+     9→     9→  CardHeader,
+    10→    10→  CardTitle,
+    11→    11→} from '@/components/ui/card'
+    12→    12→import { Button } from '@/components/ui/button'
+    13→    13→import { Input } from '@/components/ui/input'
+    14→    14→import {
+    15→    15→  Select,
+    16→    16→  SelectContent,
+    17→    17→  SelectItem,
+    18→    18→  SelectTrigger,
+    19→    19→  SelectValue,
+    20→    20→} from '@/components/ui/select'
+    21→    21→import {
+    22→    22→  Table,
+    23→    23→  TableBody,
+    24→    24→  TableCell,
+    25→    25→  TableHead,
+    26→    26→  TableHeader,
+    27→    27→  TableRow,
+    28→    28→} from '@/components/ui/table'
+    29→    29→import {
+    30→    30→  AlertDialog,
+    31→    31→  AlertDialogAction,
+    32→    32→  AlertDialogCancel,
+    33→    33→  AlertDialogContent,
+    34→    34→  AlertDialogDescription,
+    35→    35→  AlertDialogFooter,
+    36→    36→  AlertDialogHeader,
+    37→    37→  AlertDialogTitle,
+    38→    38→} from '@/components/ui/alert-dialog'
+    39→    39→import {
+    40→    40→  Plus,
+    41→    41→  Pencil,
+    42→    42→  Trash2,
+    43→    43→  Search,
+    44→    44→  ShoppingCart,
+    45→    45→  Tag,
+    46→    46→  AlertCircle,
+    47→    47→  Filter,
+    48→    48→  Inbox,
+    49→    49→  Building2,
+    50→    50→} from 'lucide-react'
+    51→    51→import type {
+    52→    52→  Bank,
+    53→    53→  Exchange,
+    54→    54→  Transaction,
+    55→    55→  TransactionType,
+    56→    56→  TransactionStatus,
+    57→    57→} from '@/lib/types'
+    58→    58→import { TransactionForm } from './TransactionForm'
+    59→    59→import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
+    60→    60→import { toast } from '@/hooks/use-toast'
+    61→    61→import { Badge } from '@/components/ui/badge'
+    62→    62→import * as storage from '@/lib/storage'
+    63→    63→
+    64→    64→const STATUS_LABELS: Record<TransactionStatus, string> = {
+    65→    65→  completada: 'Completada',
+    66→    66→  pendiente: 'Pendiente',
+    67→    67→  cancelada: 'Cancelada',
+    68→    68→}
+    69→    69→
+    70→    70→const STATUS_COLORS: Record<TransactionStatus, string> = {
+    71→    71→  completada: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    72→    72→  pendiente: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    73→    73→  cancelada: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+    74→    74→}
+    75→    75→
+    76→    76→interface TransactionsViewProps {
+    77→    77→  mode: 'compra' | 'venta' | 'all'
+    78→    78→}
+    79→    79→
+    80→    80→export function TransactionsView({ mode }: TransactionsViewProps) {
+    81→    81→  const queryClient = useQueryClient()
+    82→    82→  const [search, setSearch] = useState('')
+    83→    83→  const [statusFilter, setStatusFilter] = useState<string>('all')
+    84→    84→  const [bankFilter, setBankFilter] = useState<string>('all')
+    85→    85→  const [exchangeFilter, setExchangeFilter] = useState<string>('all')
+    86→    86→  const [formOpen, setFormOpen] = useState(false)
+    87→    87→  const [editing, setEditing] = useState<Transaction | null>(null)
+    88→    88→  const [deleting, setDeleting] = useState<Transaction | null>(null)
+    89→    89→
+    90→    90→  // Cargar bancos y exchanges
+    91→    91→  const { data: banks = [] } = useQuery<Bank[]>({
+    92→    92→    queryKey: ['banks'],
+    93→    93→    queryFn: () => storage.listBanks(),
+    94→    94→  })
+    95→    95→
+    96→    96→  const { data: exchanges = [] } = useQuery<Exchange[]>({
+    97→    97→    queryKey: ['exchanges'],
+    98→    98→    queryFn: () => storage.listExchanges(),
+    99→    99→  })
+   100→   100→
+   101→   101→  const filters = useMemo(
+   102→   102→    () => ({
+   103→   103→      type: mode !== 'all' ? (mode as TransactionType) : undefined,
+   104→   104→      status: statusFilter !== 'all' ? (statusFilter as TransactionStatus) : undefined,
+   105→   105→      bankId: bankFilter !== 'all' ? bankFilter : undefined,
+   106→   106→      exchangeId: exchangeFilter !== 'all' ? exchangeFilter : undefined,
+   107→   107→    }),
+   108→   108→    [mode, statusFilter, bankFilter, exchangeFilter]
+   109→   109→  )
+   110→   110→
+   111→   111→  const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
+   112→   112→    queryKey: ['transactions', filters],
+   113→   113→    queryFn: () => storage.listTransactions(filters),
+   114→   114→  })
+   115→   115→
+   116→   116→  const filtered = transactions.filter((t) => {
+   117→   117→    const q = search.toLowerCase().trim()
+   118→   118→    if (!q) return true
+   119→   119→    return (
+   120→   120→      t.counterparty.toLowerCase().includes(q) ||
+   121→   121→      t.asset.toLowerCase().includes(q) ||
+   122→   122→      (t.reference ?? '').toLowerCase().includes(q) ||
+   123→   123→      (t.notes ?? '').toLowerCase().includes(q)
+   124→   124→    )
+   125→   125→  })
+   126→   126→
+   127→   127→  // KPIs
+   128→   128→  const completadas = filtered.filter((t) => t.status === 'completada')
+   129→   129→  const totalMonto = completadas.reduce((s, t) => s + t.amount, 0)
+   130→   130→  const totalFiat = completadas.reduce((s, t) => s + t.total, 0)
+   131→   131→  const totalFees = completadas.reduce((s, t) => s + t.fee, 0)
+   132→   132→  const totalNeto = completadas.reduce((s, t) => s + (t.netTotal ?? t.total - t.fee), 0)
+   133→   133→  const tasaPromedio = totalMonto > 0 ? totalFiat / totalMonto : 0
+   134→   134→
+   135→   135→  async function refetch() {
+   136→   136→    await queryClient.invalidateQueries({ queryKey: ['transactions'] })
+   137→   137→    await queryClient.invalidateQueries({ queryKey: ['banks'] })
+   138→   138→    await queryClient.invalidateQueries({ queryKey: ['exchanges'] })
+   139→   139→    await queryClient.invalidateQueries({ queryKey: ['stats'] })
+   140→   140→  }
+   141→   141→
+   142→   142→  function openNew() {
+   143→   143→    setEditing(null)
+   144→   144→    setFormOpen(true)
+   145→   145→  }
+   146→   146→
+   147→   147→  function openEdit(t: Transaction) {
+   148→   148→    setEditing(t)
+   149→   149→    setFormOpen(true)
+   150→   150→  }
+   151→   151→
+   152→   152→  async function confirmDelete() {
+   153→   153→    if (!deleting) return
+   154→   154→    try {
+   155→   155→      await storage.deleteTransaction(deleting.id)
+   156→   156→      toast({
+   157→   157→        title: 'Transacción eliminada',
+   158→   158→        description: `Operación con ${deleting.counterparty} fue eliminada.`,
+   159→   159→      })
+   160→   160→      await refetch()
+   161→   161→    } catch (e) {
+   162→   162→      toast({
+   163→   163→        title: 'Error',
+   164→   164→        description: e instanceof Error ? e.message : 'Error desconocido',
+   165→   165→        variant: 'destructive',
+   166→   166→      })
+   167→   167→    } finally {
+   168→   168→      setDeleting(null)
+   169→   169→    }
+   170→   170→  }
+   171→   171→
+   172→   172→  const title =
+   173→   173→    mode === 'compra'
+   174→   174→      ? 'Compras P2P'
+   175→   175→      : mode === 'venta'
+   176→   176→        ? 'Ventas P2P'
+   177→   177→        : 'Todas las transacciones'
+   178→   178→
+   179→   179→  const description =
+   180→   180→    mode === 'compra'
+   181→   181→      ? 'Operaciones donde recibiste un activo a cambio de moneda fiat.'
+   182→   182→      : mode === 'venta'
+   183→   183→        ? 'Operaciones donde entregaste un activo a cambio de moneda fiat.'
+   184→   184→        : 'Historial completo de compras y ventas P2P.'
+   185→   185→
+   186→   186→  const defaultType: TransactionType =
+   187→   187→    mode === 'venta' ? 'venta' : 'compra'
+   188→   188→
+   189→   189→  return (
+   190→   190→    <div className="space-y-2.5 sm:space-y-4">
+   191→   191→      {/* KPIs */}
+   192→   192→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+   193→   193→        <Card className="p-0">
+   194→   194→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   195→   195→            <CardDescription className="text-[9px] sm:text-xs">Operaciones</CardDescription>
+   196→   196→            <CardTitle className="text-sm sm:text-2xl tabular-nums leading-tight">
+   197→   197→              {filtered.length}
+   198→   198→            </CardTitle>
+   199→   199→          </CardHeader>
+   200→   200→        </Card>
+   201→   201→        <Card className="p-0">
+   202→   202→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   203→   203→            <CardDescription className="text-[9px] sm:text-xs">Volumen bruto</CardDescription>
+   204→   204→            <CardTitle className="text-sm sm:text-2xl tabular-nums leading-tight">
+   205→   205→              {formatCurrency(totalFiat)}
+   206→   206→            </CardTitle>
+   207→   207→          </CardHeader>
+   208→   208→        </Card>
+   209→   209→        <Card className="p-0">
+   210→   210→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   211→   211→            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   212→   212→              <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" /> Comisiones
+   213→   213→            </CardDescription>
+   214→   214→            <CardTitle className="text-sm sm:text-2xl tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
+   215→   215→              {formatCurrency(totalFees)}
+   216→   216→            </CardTitle>
+   217→   217→          </CardHeader>
+   218→   218→        </Card>
+   219→   219→        <Card className="p-0">
+   220→   220→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   221→   221→            <CardDescription className="text-[9px] sm:text-xs">Volumen neto</CardDescription>
+   222→   222→            <CardTitle className="text-sm sm:text-2xl tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
+   223→   223→              {formatCurrency(totalNeto)}
+   224→   224→            </CardTitle>
+   225→   225→          </CardHeader>
+   226→   226→        </Card>
+   227→   227→      </div>
+   228→   228→
+   229→   229→      {/* Header con acciones */}
+   230→   230→      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
+   231→   231→        <div>
+   232→   232→          <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2">
+   233→   233→            {mode === 'compra' && <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />}
+   234→   234→            {mode === 'venta' && <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500" />}
+   235→   235→            {title}
+   236→   236→          </h2>
+   237→   237→          <p className="text-[11px] sm:text-sm text-muted-foreground">{description}</p>
+   238→   238→        </div>
+   239→   239→        <Button onClick={openNew} size="sm" className="self-start">
+   240→   240→          <Plus className="mr-1 h-4 w-4" />
+   241→   241→          {mode === 'venta' ? 'Nueva venta' : 'Nueva compra'}
+   242→   242→        </Button>
+   243→   243→      </div>
+   244→   244→
+   245→   245→      {/* Filtros */}
+   246→   246→      <div className="grid grid-cols-2 sm:flex sm:flex-row gap-1.5 sm:gap-2">
+   247→   247→        <div className="relative col-span-2 sm:flex-1">
+   248→   248→          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+   249→   249→          <Input
+   250→   250→            placeholder="Buscar contraparte, activo..."
+   251→   251→            value={search}
+   252→   252→            onChange={(e) => setSearch(e.target.value)}
+   253→   253→            className="pl-8 h-9 text-sm"
+   254→   254→          />
+   255→   255→        </div>
+   256→   256→        <Select value={statusFilter} onValueChange={setStatusFilter}>
+   257→   257→          <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
+   258→   258→            <Filter className="mr-1 h-3.5 w-3.5" />
+   259→   259→            <SelectValue placeholder="Estado" />
+   260→   260→          </SelectTrigger>
+   261→   261→          <SelectContent>
+   262→   262→            <SelectItem value="all">Todos</SelectItem>
+   263→   263→            <SelectItem value="completada">Completadas</SelectItem>
+   264→   264→            <SelectItem value="pendiente">Pendientes</SelectItem>
+   265→   265→            <SelectItem value="cancelada">Canceladas</SelectItem>
+   266→   266→          </SelectContent>
+   267→   267→        </Select>
+   268→   268→        <Select value={bankFilter} onValueChange={setBankFilter}>
+   269→   269→          <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
+   270→   270→            <SelectValue placeholder="Banco" />
+   271→   271→          </SelectTrigger>
+   272→   272→          <SelectContent>
+   273→   273→            <SelectItem value="all">Todos los bancos</SelectItem>
+   274→   274→            {banks.map((b) => (
+   275→   275→              <SelectItem key={b.id} value={b.id}>
+   276→   276→                {b.name}
+   277→   277→              </SelectItem>
+   278→   278→            ))}
+   279→   279→          </SelectContent>
+   280→   280→        </Select>
+   281→   281→        <Select value={exchangeFilter} onValueChange={setExchangeFilter}>
+   282→   282→          <SelectTrigger className="w-full sm:w-36 h-9 text-sm col-span-2 sm:col-span-1">
+   283→   283→            <SelectValue placeholder="Exchange" />
+   284→   284→          </SelectTrigger>
+   285→   285→          <SelectContent>
+   286→   286→            <SelectItem value="all">Todos</SelectItem>
+   287→   287→            <SelectItem value="__none__">Sin exchange</SelectItem>
+   288→   288→            {exchanges.map((e) => (
+   289→   289→              <SelectItem key={e.id} value={e.id}>
+   290→   290→                {e.name}
+   291→   291→              </SelectItem>
+   292→   292→            ))}
+   293→   293→          </SelectContent>
+   294→   294→        </Select>
+   295→   295→      </div>
+   296→   296→
+   297→   297→      {/* Tabla en desktop / cards en móvil */}
+   298→   298→      <Card>
+   299→   299→        <CardContent className="p-0">
+   300→   300→          {isLoading ? (
+   301→   301→            <div className="p-4 sm:p-8 space-y-2">
+   302→   302→              {[...Array(4)].map((_, i) => (
+   303→   303→                <div key={i} className="h-12 rounded bg-muted/40 animate-pulse" />
+   304→   304→              ))}
+   305→   305→            </div>
+   306→   306→          ) : filtered.length === 0 ? (
+   307→   307→            <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+   308→   308→              <Inbox className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/50 mb-3" />
+   309→   309→              <p className="font-medium text-sm">No hay transacciones</p>
+   310→   310→              <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-sm px-4">
+   311→   311→                {search || statusFilter !== 'all' || bankFilter !== 'all' || exchangeFilter !== 'all'
+   312→   312→                  ? 'No se encontraron resultados con los filtros actuales.'
+   313→   313→                  : `Registra tu primera ${mode === 'venta' ? 'venta' : mode === 'compra' ? 'compra' : 'operación'} para empezar a llevar el control.`}
+   314→   314→              </p>
+   315→   315→              {!search && statusFilter === 'all' && bankFilter === 'all' && exchangeFilter === 'all' && (
+   316→   316→                <Button onClick={openNew} size="sm" className="mt-4">
+   317→   317→                  <Plus className="mr-1 h-4 w-4" />
+   318→   318→                  {mode === 'venta' ? 'Registrar venta' : 'Registrar compra'}
+   319→   319→                </Button>
+   320→   320→              )}
+   321→   321→            </div>
+   322→   322→          ) : (
+   323→   323→            <>
+   324→   324→              {/* MOBILE: cards verticales */}
+   325→   325→              <div className="sm:hidden divide-y">
+   326→   326→                {filtered.map((t) => (
+   327→   327→                  <div key={t.id} className="p-2.5 space-y-1.5">
+   328→   328→                    <div className="flex items-center justify-between gap-2">
+   329→   329→                      <div className="flex items-center gap-1.5 min-w-0">
+   330→   330→                        <Badge
+   331→   331→                          variant="outline"
+   332→   332→                          className={
+   333→   333→                            t.type === 'compra'
+   334→   334→                              ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300 text-[9px] px-1.5 py-0'
+   335→   335→                              : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300 text-[9px] px-1.5 py-0'
+   336→   336→                          }
+   337→   337→                        >
+   338→   338→                          {t.type === 'compra' ? 'Compra' : 'Venta'}
+   339→   339→                        </Badge>
+   340→   340→                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+   341→   341→                          {formatDate(t.date, true)}
+   342→   342→                        </span>
+   343→   343→                      </div>
+   344→   344→                      <div className="flex gap-0.5 flex-shrink-0">
+   345→   345→                        <Button
+   346→   346→                          size="icon"
+   347→   347→                          variant="ghost"
+   348→   348→                          className="h-7 w-7"
+   349→   349→                          onClick={() => openEdit(t)}
+   350→   350→                          title="Editar"
+   351→   351→                        >
+   352→   352→                          <Pencil className="h-3 w-3" />
+   353→   353→                        </Button>
+   354→   354→                        <Button
+   355→   355→                          size="icon"
+   356→   356→                          variant="ghost"
+   357→   357→                          className="h-7 w-7 hover:text-rose-600"
+   358→   358→                          onClick={() => setDeleting(t)}
+   359→   359→                          title="Eliminar"
+   360→   360→                        >
+   361→   361→                          <Trash2 className="h-3 w-3" />
+   362→   362→                        </Button>
+   363→   363→                      </div>
+   364→   364→                    </div>
+   365→   365→                    <div className="flex items-center justify-between gap-2">
+   366→   366→                      <span className="font-medium text-sm truncate">{t.counterparty}</span>
+   367→   367→                      {t.exchange && (
+   368→   368→                        <span
+   369→   369→                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] flex-shrink-0"
+   370→   370→                          style={{ backgroundColor: `${t.exchange.color}22` }}
+   371→   371→                          title={t.exchange.name}
+   372→   372→                        >
+   373→   373→                          <span
+   374→   374→                            className="w-1.5 h-1.5 rounded-full"
+   375→   375→                            style={{ backgroundColor: t.exchange.color }}
+   376→   376→                          />
+   377→   377→                          {t.exchange.shortName ?? t.exchange.name}
+   378→   378→                        </span>
+   379→   379→                      )}
+   380→   380→                    </div>
+   381→   381→                    {t.reference && (
+   382→   382→                      <p className="text-[10px] text-muted-foreground font-mono truncate">
+   383→   383→                        Ref: {t.reference}
+   384→   384→                      </p>
+   385→   385→                    )}
+   386→   386→                    <div className="flex items-center justify-between text-xs">
+   387→   387→                      <span className="tabular-nums">
+   388→   388→                        {formatNumber(t.amount, 2)} <span className="text-muted-foreground">{t.asset}</span>
+   389→   389→                      </span>
+   390→   390→                      <span className="tabular-nums text-muted-foreground">
+   391→   391→                        @{formatNumber(t.rate, 2)}
+   392→   392→                      </span>
+   393→   393→                    </div>
+   394→   394→                    <div className="flex items-center justify-between text-xs">
+   395→   395→                      <span className="text-muted-foreground">Bruto</span>
+   396→   396→                      <span className="font-medium tabular-nums">
+   397→   397→                        {formatCurrency(t.total, t.currency)}
+   398→   398→                      </span>
+   399→   399→                    </div>
+   400→   400→                    {t.fee > 0 && (
+   401→   401→                      <div className="flex items-center justify-between text-xs">
+   402→   402→                        <span className="text-muted-foreground">Comisión</span>
+   403→   403→                        <span className="text-amber-600 dark:text-amber-400 tabular-nums">
+   404→   404→                          −{formatCurrency(t.fee, t.currency)}
+   405→   405→                        </span>
+   406→   406→                      </div>
+   407→   407→                    )}
+   408→   408→                    <div className="flex items-center justify-between text-xs">
+   409→   409→                      <span className="text-muted-foreground">Neto</span>
+   410→   410→                      <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+   411→   411→                        {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+   412→   412→                      </span>
+   413→   413→                    </div>
+   414→   414→                    <div className="flex items-center justify-between gap-2 pt-0.5">
+   415→   415→                      <div className="flex items-center gap-1 text-[10px] min-w-0">
+   416→   416→                        {t.fromBank && (
+   417→   417→                          <span
+   418→   418→                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded truncate"
+   419→   419→                            style={{ backgroundColor: `${t.fromBank.color}22` }}
+   420→   420→                            title={`Origen: ${t.fromBank.name}`}
+   421→   421→                          >
+   422→   422→                            <span
+   423→   423→                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+   424→   424→                              style={{ backgroundColor: t.fromBank.color }}
+   425→   425→                            />
+   426→   426→                            <span className="truncate">{t.fromBank.name}</span>
+   427→   427→                          </span>
+   428→   428→                        )}
+   429→   429→                        {t.toBank && (
+   430→   430→                          <>
+   431→   431→                            <span className="text-muted-foreground flex-shrink-0">→</span>
+   432→   432→                            <span
+   433→   433→                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded truncate"
+   434→   434→                              style={{ backgroundColor: `${t.toBank.color}22` }}
+   435→   435→                              title={`Destino: ${t.toBank.name}`}
+   436→   436→                            >
+   437→   437→                              <span
+   438→   438→                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+   439→   439→                                style={{ backgroundColor: t.toBank.color }}
+   440→   440→                              />
+   441→   441→                              <span className="truncate">{t.toBank.name}</span>
+   442→   442→                            </span>
+   443→   443→                          </>
+   444→   444→                        )}
+   445→   445→                        {!t.fromBank && !t.toBank && (
+   446→   446→                          <span className="text-muted-foreground">Sin bancos</span>
+   447→   447→                        )}
+   448→   448→                      </div>
+   449→   449→                      <span
+   450→   450→                        className={`inline-block px-1.5 py-0.5 rounded text-[9px] flex-shrink-0 ${STATUS_COLORS[t.status]}`}
+   451→   451→                      >
+   452→   452→                        {STATUS_LABELS[t.status]}
+   453→   453→                      </span>
+   454→   454→                    </div>
+   455→   455→                  </div>
+   456→   456→                ))}
+   457→   457→              </div>
+   458→   458→
+   459→   459→              {/* DESKTOP: tabla */}
+   460→   460→              <div className="hidden sm:block overflow-x-auto">
+   461→   461→                <Table>
+   462→   462→                  <TableHeader>
+   463→   463→                    <TableRow>
+   464→   464→                      <TableHead className="w-[100px]">Tipo</TableHead>
+   465→   465→                      <TableHead>Fecha</TableHead>
+   466→   466→                      <TableHead>Contraparte</TableHead>
+   467→   467→                      <TableHead>Exchange</TableHead>
+   468→   468→                      <TableHead className="text-right">Activo</TableHead>
+   469→   469→                      <TableHead className="text-right">Tasa</TableHead>
+   470→   470→                      <TableHead className="text-right">Bruto</TableHead>
+   471→   471→                      <TableHead className="text-right">Comisión</TableHead>
+   472→   472→                      <TableHead className="text-right">Neto</TableHead>
+   473→   473→                      <TableHead>Bancos</TableHead>
+   474→   474→                      <TableHead>Estado</TableHead>
+   475→   475→                      <TableHead className="w-[80px]"></TableHead>
+   476→   476→                    </TableRow>
+   477→   477→                  </TableHeader>
+   478→   478→                  <TableBody>
+   479→   479→                    {filtered.map((t) => (
+   480→   480→                      <TableRow key={t.id} className="hover:bg-muted/40">
+   481→   481→                        <TableCell>
+   482→   482→                          <Badge
+   483→   483→                            variant="outline"
+   484→   484→                            className={
+   485→   485→                              t.type === 'compra'
+   486→   486→                                ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300'
+   487→   487→                                : 'border-rose-300 text-rose-700 dark:border-rose-700 dark:text-rose-300'
+   488→   488→                            }
+   489→   489→                          >
+   490→   490→                            {t.type === 'compra' ? 'Compra' : 'Venta'}
+   491→   491→                          </Badge>
+   492→   492→                        </TableCell>
+   493→   493→                        <TableCell className="text-xs whitespace-nowrap">
+   494→   494→                          {formatDate(t.date, true)}
+   495→   495→                        </TableCell>
+   496→   496→                        <TableCell>
+   497→   497→                          <div className="font-medium truncate max-w-[180px]">
+   498→   498→                            {t.counterparty}
+   499→   499→                          </div>
+   500→   500→                          {t.reference && (
+   501→   501→                            <div className="text-xs text-muted-foreground font-mono">
+   502→   502→                              Ref: {t.reference}
+   503→   503→                            </div>
+   504→   504→                          )}
+   505→   505→                        </TableCell>
+   506→   506→                        <TableCell>
+   507→   507→                          {t.exchange ? (
+   508→   508→                            <span
+   509→   509→                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+   510→   510→                              style={{ backgroundColor: `${t.exchange.color}22` }}
+   511→   511→                              title={t.exchange.name}
+   512→   512→                            >
+   513→   513→                              <span
+   514→   514→                                className="w-1.5 h-1.5 rounded-full"
+   515→   515→                                style={{ backgroundColor: t.exchange.color }}
+   516→   516→                              />
+   517→   517→                              {t.exchange.shortName ?? t.exchange.name}
+   518→   518→                            </span>
+   519→   519→                          ) : (
+   520→   520→                            <span className="text-xs text-muted-foreground">—</span>
+   521→   521→                          )}
+   522→   522→                        </TableCell>
+   523→   523→                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+   524→   524→                          <div className="font-medium">
+   525→   525→                            {formatNumber(t.amount, 2)}{' '}
+   526→   526→                            <span className="text-xs text-muted-foreground">
+   527→   527→                              {t.asset}
+   528→   528→                            </span>
+   529→   529→                          </div>
+   530→   530→                        </TableCell>
+   531→   531→                        <TableCell className="text-right tabular-nums text-sm">
+   532→   532→                          {formatNumber(t.rate, 2)}
+   533→   533→                        </TableCell>
+   534→   534→                        <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
+   535→   535→                          {formatCurrency(t.total, t.currency)}
+   536→   536→                        </TableCell>
+   537→   537→                        <TableCell className="text-right tabular-nums text-xs whitespace-nowrap">
+   538→   538→                          {t.fee > 0 ? (
+   539→   539→                            <span className="text-amber-600 dark:text-amber-400">
+   540→   540→                              −{formatCurrency(t.fee, t.currency)}
+   541→   541→                            </span>
+   542→   542→                          ) : (
+   543→   543→                            <span className="text-muted-foreground">—</span>
+   544→   544→                          )}
+   545→   545→                        </TableCell>
+   546→   546→                        <TableCell className="text-right tabular-nums font-medium whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+   547→   547→                          {formatCurrency(t.netTotal ?? t.total - t.fee, t.currency)}
+   548→   548→                        </TableCell>
+   549→   549→                        <TableCell>
+   550→   550→                          <div className="flex items-center gap-1 text-xs">
+   551→   551→                            {t.fromBank ? (
+   552→   552→                              <span
+   553→   553→                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+   554→   554→                                style={{ backgroundColor: `${t.fromBank.color}22` }}
+   555→   555→                                title={`Origen: ${t.fromBank.name}`}
+   556→   556→                              >
+   557→   557→                                <span
+   558→   558→                                  className="w-1.5 h-1.5 rounded-full"
+   559→   559→                                  style={{ backgroundColor: t.fromBank.color }}
+   560→   560→                                />
+   561→   561→                                {t.fromBank.name}
+   562→   562→                              </span>
+   563→   563→                            ) : (
+   564→   564→                              <span className="text-muted-foreground">—</span>
+   565→   565→                            )}
+   566→   566→                            {t.toBank && (
+   567→   567→                              <>
+   568→   568→                                <span className="text-muted-foreground">→</span>
+   569→   569→                                <span
+   570→   570→                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+   571→   571→                                  style={{ backgroundColor: `${t.toBank.color}22` }}
+   572→   572→                                  title={`Destino: ${t.toBank.name}`}
+   573→   573→                                >
+   574→   574→                                  <span
+   575→   575→                                    className="w-1.5 h-1.5 rounded-full"
+   576→   576→                                    style={{ backgroundColor: t.toBank.color }}
+   577→   577→                                  />
+   578→   578→                                  {t.toBank.name}
+   579→   579→                                </span>
+   580→   580→                              </>
+   581→   581→                            )}
+   582→   582→                          </div>
+   583→   583→                        </TableCell>
+   584→   584→                        <TableCell>
+   585→   585→                          <span
+   586→   586→                            className={`inline-block px-2 py-0.5 rounded text-xs ${STATUS_COLORS[t.status]}`}
+   587→   587→                          >
+   588→   588→                            {STATUS_LABELS[t.status]}
+   589→   589→                          </span>
+   590→   590→                        </TableCell>
+   591→   591→                        <TableCell>
+   592→   592→                          <div className="flex gap-0.5">
+   593→   593→                            <Button
+   594→   594→                              size="icon"
+   595→   595→                              variant="ghost"
+   596→   596→                              className="h-8 w-8"
+   597→   597→                              onClick={() => openEdit(t)}
+   598→   598→                              title="Editar"
+   599→   599→                            >
+   600→   600→                              <Pencil className="h-3.5 w-3.5" />
+   601→   601→                            </Button>
+   602→   602→                            <Button
+   603→   603→                              size="icon"
+   604→   604→                              variant="ghost"
+   605→   605→                              className="h-8 w-8 hover:text-rose-600"
+   606→   606→                              onClick={() => setDeleting(t)}
+   607→   607→                              title="Eliminar"
+   608→   608→                            >
+   609→   609→                              <Trash2 className="h-3.5 w-3.5" />
+   610→   610→                            </Button>
+   611→   611→                          </div>
+   612→   612→                        </TableCell>
+   613→   613→                      </TableRow>
+   614→   614→                    ))}
+   615→   615→                  </TableBody>
+   616→   616→                </Table>
+   617→   617→              </div>
+   618→   618→            </>
+   619→   619→          )}
+   620→   620→        </CardContent>
+   621→   621→      </Card>
+   622→   622→
+   623→   623→      <TransactionForm
+   624→   624→        open={formOpen}
+   625→   625→        onOpenChange={setFormOpen}
+   626→   626→        transaction={editing}
+   627→   627→        defaultType={defaultType}
+   628→   628→        banks={banks}
+   629→   629→        onSaved={refetch}
+   630→   630→      />
+   631→   631→
+   632→   632→      <AlertDialog
+   633→   633→        open={!!deleting}
+   634→   634→        onOpenChange={(o) => !o && setDeleting(null)}
+   635→   635→      >
+   636→   636→        <AlertDialogContent>
+   637→   637→          <AlertDialogHeader>
+   638→   638→            <AlertDialogTitle className="flex items-center gap-2">
+   639→   639→              <AlertCircle className="h-5 w-5 text-rose-500" />
+   640→   640→              Eliminar transacción
+   641→   641→            </AlertDialogTitle>
+   642→   642→            <AlertDialogDescription>
+   643→   643→              ¿Eliminar la {deleting?.type === 'compra' ? 'compra' : 'venta'} de{' '}
+   644→   644→              {formatNumber(deleting?.amount ?? 0)} {deleting?.asset} con{' '}
+   645→   645→              {deleting?.counterparty}? Esta acción no se puede deshacer.
+   646→   646→            </AlertDialogDescription>
+   647→   647→          </AlertDialogHeader>
+   648→   648→          <AlertDialogFooter>
+   649→   649→            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+   650→   650→            <AlertDialogAction
+   651→   651→              onClick={confirmDelete}
+   652→   652→              className="bg-rose-600 hover:bg-rose-700"
+   653→   653→            >
+   654→   654→              Eliminar
+   655→   655→            </AlertDialogAction>
+   656→   656→          </AlertDialogFooter>
+   657→   657→        </AlertDialogContent>
+   658→   658→      </AlertDialog>
+   659→   659→    </div>
+   660→   660→  )
+   661→   661→}
+   662→   662→
