@@ -18,7 +18,7 @@ export default function DescargarPage() {
           </div>
           <h1 className="text-2xl font-bold">P2P Ledger v1.0</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            APK para Android · 2.6 MB
+            APK para Android · 2.9 MB
           </p>
         </div>
 
