@@ -480,6 +480,26 @@ function defaultExchanges(): Exchange[] {
       createdAt: now,
       updatedAt: now,
     },
+    {
+      id: uid(),
+      name: 'SkipShift',
+      shortName: 'SKIP',
+      color: '#ff6b6b',
+      buyFeeType: 'percent' as FeeType,
+      buyFeeValue: 0,
+      buyTiers: [],
+      sellFeeType: 'percent' as FeeType,
+      sellFeeValue: 0,
+      sellTiers: [],
+      fixedFee: 0,
+      fixedFeeCurrency: 'USDT',
+      discountPercent: 0,
+      discountLabel: null,
+      isActive: true,
+      notes: 'SkipShift es una plataforma P2P para compra y venta de criptomonedas. Sin comisión directa en operaciones P2P.',
+      createdAt: now,
+      updatedAt: now,
+    },
   ]
 }
 

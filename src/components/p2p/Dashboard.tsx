@@ -145,14 +145,14 @@ export function Dashboard() {
           <Card className="p-0">
             <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
               <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
-                Pendientes
+                <Wallet className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                Stock activo
               </CardDescription>
               <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {r.pendientes}
+                {formatCurrency(r.activoNeto)}
               </CardTitle>
               <p className="text-[9px] sm:text-xs text-muted-foreground">
-                Por confirmar
+                Capital en VES
               </p>
             </CardHeader>
           </Card>
@@ -212,7 +212,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* KPIs secundarios */}
+      {/* KPIs secundarios: tasas y operación */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
         <Card className="p-0">
           <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
@@ -239,17 +239,6 @@ export function Dashboard() {
         <Card className="p-0">
           <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
             <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <Wallet className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              Stock activo
-            </CardDescription>
-            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
-              {formatNumber(r.activoNeto, 2)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
               <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               Spread
             </CardDescription>
@@ -262,6 +251,20 @@ export function Dashboard() {
             >
               {formatNumber(r.avgRateVenta - r.avgRateCompra, 2)}
             </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="p-0">
+          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
+              Pendientes
+            </CardDescription>
+            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
+              {r.pendientes}
+            </CardTitle>
+            <p className="text-[9px] sm:text-xs text-muted-foreground">
+              Por confirmar
+            </p>
           </CardHeader>
         </Card>
       </div>

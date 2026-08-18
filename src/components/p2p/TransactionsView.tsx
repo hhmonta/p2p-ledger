@@ -236,19 +236,45 @@ async function exportPDF(transactions: Transaction[], filename: string) {
     doc.text(`Generado: ${formatDate(new Date(), true)}`, 14, 25)
     doc.text(`Total: ${transactions.length} operaciones`, 14, 30)
 
-    // Resumen financiero
+    // Resumen financiero — separado por moneda
     const compras = transactions.filter((t) => t.type === 'compra')
     const ventas = transactions.filter((t) => t.type === 'venta')
-    const totalCompras = compras.reduce((s, t) => s + t.total, 0)
-    const totalVentas = ventas.reduce((s, t) => s + t.total, 0)
-    const totalComisiones = transactions.reduce((s, t) => s + t.fee, 0)
+
+    // Separar por moneda (VES / USD)
+    const comprasVES = compras.filter((t) => t.currency === 'VES')
+    const ventasVES = ventas.filter((t) => t.currency === 'VES')
+    const txsVES = transactions.filter((t) => t.currency === 'VES')
+    const comprasUSD = compras.filter((t) => t.currency === 'USD')
+    const ventasUSD = ventas.filter((t) => t.currency === 'USD')
+    const txsUSD = transactions.filter((t) => t.currency === 'USD')
+
+    const totalComprasVES = comprasVES.reduce((s, t) => s + t.total, 0)
+    const totalVentasVES = ventasVES.reduce((s, t) => s + t.total, 0)
+    const totalFeesVES = txsVES.reduce((s, t) => s + t.fee, 0)
+    const totalComprasUSD = comprasUSD.reduce((s, t) => s + t.total, 0)
+    const totalVentasUSD = ventasUSD.reduce((s, t) => s + t.total, 0)
+    const totalFeesUSD = txsUSD.reduce((s, t) => s + t.fee, 0)
 
     doc.setFontSize(9)
     doc.setTextColor(30, 41, 59)
     const summaryY = 36
-    doc.text(`Compras: ${compras.length} ops | Total: ${formatCurrency(totalCompras, transactions[0]?.currency ?? 'VES')}`, 14, summaryY)
-    doc.text(`Ventas: ${ventas.length} ops | Total: ${formatCurrency(totalVentas, transactions[0]?.currency ?? 'VES')}`, 14, summaryY + 5)
-    doc.text(`Comisiones totales: ${formatCurrency(totalComisiones, transactions[0]?.currency ?? 'VES')}`, 14, summaryY + 10)
+
+    // VES
+    doc.setFontSize(9)
+    doc.setTextColor(16, 185, 129) // emerald
+    doc.text('En VES (Bolívares)', 14, summaryY)
+    doc.setTextColor(30, 41, 59)
+    doc.text(`Compras: ${comprasVES.length} ops | Total: ${formatCurrency(totalComprasVES, 'VES')}`, 14, summaryY + 4.5)
+    doc.text(`Ventas: ${ventasVES.length} ops | Total: ${formatCurrency(totalVentasVES, 'VES')}`, 14, summaryY + 9)
+    doc.text(`Comisiones: ${formatCurrency(totalFeesVES, 'VES')}`, 14, summaryY + 13.5)
+
+    // USD
+    doc.setTextColor(59, 130, 246) // blue
+    doc.text('En USD (Dólares)', 14, summaryY + 20)
+    doc.setTextColor(30, 41, 59)
+    doc.text(`Compras: ${comprasUSD.length} ops | Total: ${formatCurrency(totalComprasUSD, 'USD')}`, 14, summaryY + 24.5)
+    doc.text(`Ventas: ${ventasUSD.length} ops | Total: ${formatCurrency(totalVentasUSD, 'USD')}`, 14, summaryY + 29)
+    doc.text(`Comisiones: ${formatCurrency(totalFeesUSD, 'USD')}`, 14, summaryY + 33.5)
 
     // Tabla de transacciones
     const tableHeaders = [['Tipo', 'Fecha', 'Contraparte', 'Activo', 'Cantidad', 'Tasa', 'Total', 'Comisión', 'Neto', 'Exchange', 'Estado']]
@@ -269,7 +295,7 @@ async function exportPDF(transactions: Transaction[], filename: string) {
     autoTable(doc, {
       head: tableHeaders,
       body: tableRows,
-      startY: summaryY + 16,
+      startY: summaryY + 40,
       theme: 'grid',
       styles: {
         fontSize: 7,
