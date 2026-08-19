@@ -1055,36 +1055,64 @@ export async function getStats(): Promise<Stats> {
   const ventas = completadas.filter((t) => t.type === 'venta')
   const pendientes = transactions.filter((t) => t.status === 'pendiente').length
 
-  const totalCompras = compras.reduce((s, t) => s + t.total, 0)
-  const totalVentas = ventas.reduce((s, t) => s + t.total, 0)
-  const montoCompras = compras.reduce((s, t) => s + t.amount, 0)
-  const montoVentas = ventas.reduce((s, t) => s + t.amount, 0)
-  const feesCompras = compras.reduce((s, t) => s + (t.fee || 0), 0)
-  const feesVentas = ventas.reduce((s, t) => s + (t.fee || 0), 0)
+  // === Separar por moneda desde el origen ===
+  const comprasVES = compras.filter((t) => t.currency === 'VES')
+  const ventasVES = ventas.filter((t) => t.type === 'venta' && t.currency === 'VES')
+  const comprasUSD = compras.filter((t) => t.currency === 'USD')
+  const ventasUSD = ventas.filter((t) => t.type === 'venta' && t.currency === 'USD')
+
+  // VES
+  const totalCompras = comprasVES.reduce((s, t) => s + t.total, 0)
+  const totalVentas = ventasVES.reduce((s, t) => s + t.total, 0)
+  const montoCompras = comprasVES.reduce((s, t) => s + t.amount, 0)
+  const montoVentas = ventasVES.reduce((s, t) => s + t.amount, 0)
+  const feesCompras = comprasVES.reduce((s, t) => s + (t.fee || 0), 0)
+  const feesVentas = ventasVES.reduce((s, t) => s + (t.fee || 0), 0)
   const feesTotal = feesCompras + feesVentas
   const netCompras = totalCompras - feesCompras
   const netVentas = totalVentas - feesVentas
 
-  const avgRateCompra = montoCompras > 0 ? totalCompras / montoCompras : 0
-  const avgRateVenta = montoVentas > 0 ? totalVentas / montoVentas : 0
-  const activoNeto = montoCompras - montoVentas
+  // USD (transacciones realmente en USD)
+  const totalComprasUSD = comprasUSD.reduce((s, t) => s + t.total, 0)
+  const totalVentasUSD = ventasUSD.reduce((s, t) => s + t.total, 0)
+  const feesComprasUSD = comprasUSD.reduce((s, t) => s + (t.fee || 0), 0)
+  const feesVentasUSD = ventasUSD.reduce((s, t) => s + (t.fee || 0), 0)
+  const feesTotalUSD = feesComprasUSD + feesVentasUSD
+  const netComprasUSD = totalComprasUSD - feesComprasUSD
+  const netVentasUSD = totalVentasUSD - feesVentasUSD
+
+  // Tasas promedio (todas las monedas para referencia)
+  const totalAmountCompras = compras.reduce((s, t) => s + t.amount, 0)
+  const totalAmountVentas = ventas.reduce((s, t) => s + t.amount, 0)
+  const totalFiatCompras = compras.reduce((s, t) => s + t.total, 0)
+  const totalFiatVentas = ventas.reduce((s, t) => s + t.total, 0)
+  const avgRateCompra = totalAmountCompras > 0 ? totalFiatCompras / totalAmountCompras : 0
+  const avgRateVenta = totalAmountVentas > 0 ? totalFiatVentas / totalAmountVentas : 0
+
+  // Stock activo = capital en VES neto (comprado - vendido en VES)
+  const activoNeto = netCompras - netVentas
+  // Stock activo USD = capital en USD neto
+  const activoNetoUSD = netComprasUSD - netVentasUSD
+
+  // Ganancia: spread × volumen cruzado − comisiones (solo VES)
   const volumenCruzado = Math.min(montoCompras, montoVentas)
   const gananciaBruta =
     volumenCruzado > 0 ? (avgRateVenta - avgRateCompra) * volumenCruzado : 0
-  const gananciaEstimada = gananciaBruta // bruta (sin comisiones)
-  const gananciaNeta = gananciaBruta - feesTotal // neta (después de comisiones)
+  const gananciaEstimada = gananciaBruta
+  const gananciaNeta = gananciaBruta - feesTotal
 
-  // Equivalentes en USD (usando tasa promedio general como referencia)
-  const avgRate = avgRateCompra > 0 && avgRateVenta > 0 ? (avgRateCompra + avgRateVenta) / 2 : avgRateCompra || avgRateVenta || 1
-  const totalComprasUSD = avgRate > 0 ? totalCompras / avgRate : 0
-  const totalVentasUSD = avgRate > 0 ? totalVentas / avgRate : 0
-  const feesComprasUSD = avgRate > 0 ? feesCompras / avgRate : 0
-  const feesVentasUSD = avgRate > 0 ? feesVentas / avgRate : 0
-  const feesTotalUSD = avgRate > 0 ? feesTotal / avgRate : 0
-  const netComprasUSD = avgRate > 0 ? netCompras / avgRate : 0
-  const netVentasUSD = avgRate > 0 ? netVentas / avgRate : 0
-  const gananciaNetaUSD = avgRate > 0 ? gananciaNeta / avgRate : 0
-  const activoNetoUSD = avgRate > 0 ? activoNeto / avgRate : 0
+  // Ganancia neta USD (transacciones reales en USD)
+  const volumenCruzadoUSD = Math.min(
+    comprasUSD.reduce((s, t) => s + t.amount, 0),
+    ventasUSD.reduce((s, t) => s + t.amount, 0),
+  )
+  const avgRateCompraUSD = comprasUSD.reduce((s, t) => s + t.amount, 0) > 0
+    ? totalComprasUSD / comprasUSD.reduce((s, t) => s + t.amount, 0) : 0
+  const avgRateVentaUSD = ventasUSD.reduce((s, t) => s + t.amount, 0) > 0
+    ? totalVentasUSD / ventasUSD.reduce((s, t) => s + t.amount, 0) : 0
+  const gananciaNetaUSD = volumenCruzadoUSD > 0
+    ? (avgRateVentaUSD - avgRateCompraUSD) * volumenCruzadoUSD - feesTotalUSD
+    : -feesTotalUSD
 
   // Top contrapartes
   const cpMap = new Map<string, { total: number; amount: number; count: number }>()
@@ -1171,8 +1199,8 @@ export async function getStats(): Promise<Stats> {
       totalVentas,
       montoCompras,
       montoVentas,
-      cantidadCompras: compras.length,
-      cantidadVentas: ventas.length,
+      cantidadCompras: comprasVES.length,
+      cantidadVentas: ventasVES.length,
       pendientes,
       totalBanks: banks.length,
       totalExchanges: exchanges.filter((e) => e.isActive).length,
