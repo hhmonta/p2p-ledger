@@ -1,0 +1,587 @@
+     1→'use client'
+     2→
+     3→import { useQuery } from '@tanstack/react-query'
+     4→import {
+     5→  Card,
+     6→  CardContent,
+     7→  CardDescription,
+     8→  CardHeader,
+     9→  CardTitle,
+    10→} from '@/components/ui/card'
+    11→import {
+    12→  ResponsiveContainer,
+    13→  BarChart,
+    14→  Bar,
+    15→  XAxis,
+    16→  YAxis,
+    17→  Tooltip,
+    18→  Legend,
+    19→  CartesianGrid,
+    20→  PieChart,
+    21→  Pie,
+    22→  Cell,
+    23→} from 'recharts'
+    24→import {
+    25→  TrendingUp,
+    26→  TrendingDown,
+    27→  Wallet,
+    28→  Coins,
+    29→  PiggyBank,
+    30→  Activity,
+    31→  Users,
+    32→  Clock,
+    33→  Trophy,
+    34→  Building2,
+    35→  Percent,
+    36→  DollarSign,
+    37→} from 'lucide-react'
+    38→import type { Stats } from '@/lib/types'
+    39→import { formatCurrency, formatNumber } from '@/lib/format'
+    40→import * as storage from '@/lib/storage'
+    41→
+    42→const PIE_COLORS = ['#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#3b82f6', '#84cc16']
+    43→
+    44→export function Dashboard() {
+    45→  const { data: stats, isLoading } = useQuery<Stats>({
+    46→    queryKey: ['stats'],
+    47→    queryFn: () => storage.getStats(),
+    48→  })
+    49→
+    50→  if (isLoading || !stats) {
+    51→    return (
+    52→      <div className="space-y-2.5 sm:space-y-4">
+    53→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+    54→          {[...Array(4)].map((_, i) => (
+    55→            <Card key={i} className="h-16 sm:h-24 animate-pulse bg-muted/40" />
+    56→          ))}
+    57→        </div>
+    58→        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
+    59→          {[...Array(2)].map((_, i) => (
+    60→            <Card key={i} className="h-56 sm:h-64 animate-pulse bg-muted/40" />
+    61→          ))}
+    62→        </div>
+    63→      </div>
+    64→    )
+    65→  }
+    66→
+    67→  const r = stats.resumen
+    68→  const monthly = stats.monthly.map((m) => {
+    69→    const [y, mo] = m.month.split('-')
+    70→    const date = new Date(Number(y), Number(mo) - 1, 1)
+    71→    return {
+    72→      ...m,
+    73→      label: date.toLocaleString('es-VE', { month: 'short' }),
+    74→    }
+    75→  })
+    76→
+    77→  const gananciaColor =
+    78→    r.gananciaNeta > 0
+    79→      ? 'text-emerald-600 dark:text-emerald-400'
+    80→      : r.gananciaNeta < 0
+    81→        ? 'text-rose-600 dark:text-rose-400'
+    82→        : 'text-muted-foreground'
+    83→
+    84→  const totalFees = r.feesCompras + r.feesVentas
+    85→  const totalNeto = r.netCompras + r.netVentas
+    86→
+    87→  return (
+    88→    <div className="space-y-2.5 sm:space-y-4">
+    89→      {/* Header */}
+    90→      <div>
+    91→        <h2 className="text-base sm:text-xl font-semibold">Resumen general</h2>
+    92→        <p className="text-[11px] sm:text-sm text-muted-foreground">
+    93→          Visión global de tu actividad P2P: volumen, comisiones, tasas y ganancia neta.
+    94→        </p>
+    95→      </div>
+    96→
+    97→      {/* KPIs principales - VES */}
+    98→      <div className="space-y-1.5">
+    99→        <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+   100→          <Coins className="h-3 w-3" /> En VES (Bolívares)
+   101→        </p>
+   102→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+   103→          <Card className="p-0">
+   104→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   105→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   106→                <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
+   107→                Total comprado
+   108→              </CardDescription>
+   109→              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+   110→                {formatCurrency(r.totalCompras)}
+   111→              </CardTitle>
+   112→              <p className="text-[9px] sm:text-xs text-muted-foreground">
+   113→                {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} u.
+   114→              </p>
+   115→            </CardHeader>
+   116→          </Card>
+   117→          <Card className="p-0">
+   118→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   119→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   120→                <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
+   121→                Total vendido
+   122→              </CardDescription>
+   123→              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+   124→                {formatCurrency(r.totalVentas)}
+   125→              </CardTitle>
+   126→              <p className="text-[9px] sm:text-xs text-muted-foreground">
+   127→                {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} u.
+   128→              </p>
+   129→            </CardHeader>
+   130→          </Card>
+   131→          <Card className="p-0">
+   132→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   133→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   134→                <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   135→                Ganancia neta
+   136→              </CardDescription>
+   137→              <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
+   138→                {formatCurrency(r.gananciaNeta)}
+   139→              </CardTitle>
+   140→              <p className="text-[9px] sm:text-xs text-muted-foreground">
+   141→                Spread × vol − fees
+   142→              </p>
+   143→            </CardHeader>
+   144→          </Card>
+   145→          <Card className="p-0">
+   146→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   147→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   148→                <Wallet className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   149→                Stock activo
+   150→              </CardDescription>
+   151→              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+   152→                {formatCurrency(r.activoNeto)}
+   153→              </CardTitle>
+   154→              <p className="text-[9px] sm:text-xs text-muted-foreground">
+   155→                Capital en VES
+   156→              </p>
+   157→            </CardHeader>
+   158→          </Card>
+   159→        </div>
+   160→      </div>
+   161→
+   162→      {/* KPIs principales - USD */}
+   163→      <div className="space-y-1.5">
+   164→        <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+   165→          <DollarSign className="h-3 w-3" /> En USD (Dólares)
+   166→        </p>
+   167→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+   168→          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+   169→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   170→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   171→                <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
+   172→                Total comprado
+   173→              </CardDescription>
+   174→              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+   175→                {formatCurrency(r.totalComprasUSD, 'USD')}
+   176→              </CardTitle>
+   177→            </CardHeader>
+   178→          </Card>
+   179→          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+   180→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   181→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   182→                <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
+   183→                Total vendido
+   184→              </CardDescription>
+   185→              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+   186→                {formatCurrency(r.totalVentasUSD, 'USD')}
+   187→              </CardTitle>
+   188→            </CardHeader>
+   189→          </Card>
+   190→          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+   191→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   192→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   193→                <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   194→                Ganancia neta
+   195→              </CardDescription>
+   196→              <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
+   197→                {formatCurrency(r.gananciaNetaUSD, 'USD')}
+   198→              </CardTitle>
+   199→            </CardHeader>
+   200→          </Card>
+   201→          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
+   202→            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   203→              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   204→                <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   205→                Stock activo
+   206→              </CardDescription>
+   207→              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
+   208→                {formatCurrency(r.activoNetoUSD, 'USD')}
+   209→              </CardTitle>
+   210→            </CardHeader>
+   211→          </Card>
+   212→        </div>
+   213→      </div>
+   214→
+   215→      {/* KPIs secundarios: tasas y operación */}
+   216→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+   217→        <Card className="p-0">
+   218→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   219→            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   220→              <Coins className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   221→              Tasa compra
+   222→            </CardDescription>
+   223→            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
+   224→              {formatNumber(r.avgRateCompra, 2)}
+   225→            </CardTitle>
+   226→          </CardHeader>
+   227→        </Card>
+   228→        <Card className="p-0">
+   229→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   230→            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   231→              <Coins className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   232→              Tasa venta
+   233→            </CardDescription>
+   234→            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
+   235→              {formatNumber(r.avgRateVenta, 2)}
+   236→            </CardTitle>
+   237→          </CardHeader>
+   238→        </Card>
+   239→        <Card className="p-0">
+   240→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   241→            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   242→              <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+   243→              Spread
+   244→            </CardDescription>
+   245→            <CardTitle
+   246→              className={`text-xs sm:text-lg tabular-nums leading-tight ${
+   247→                r.avgRateVenta - r.avgRateCompra >= 0
+   248→                  ? 'text-emerald-600 dark:text-emerald-400'
+   249→                  : 'text-rose-600 dark:text-rose-400'
+   250→              }`}
+   251→            >
+   252→              {formatNumber(r.avgRateVenta - r.avgRateCompra, 2)}
+   253→            </CardTitle>
+   254→          </CardHeader>
+   255→        </Card>
+   256→        <Card className="p-0">
+   257→          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+   258→            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+   259→              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
+   260→              Pendientes
+   261→            </CardDescription>
+   262→            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
+   263→              {r.pendientes}
+   264→            </CardTitle>
+   265→            <p className="text-[9px] sm:text-xs text-muted-foreground">
+   266→              Por confirmar
+   267→            </p>
+   268→          </CardHeader>
+   269→        </Card>
+   270→      </div>
+   271→
+   272→      {/* Comisiones: bloque destacado VES + USD */}
+   273→      <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
+   274→        <CardContent className="p-2.5 sm:p-6">
+   275→          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+   276→            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+   277→              <div className="h-7 w-7 sm:h-10 sm:w-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+   278→                <Percent className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+   279→              </div>
+   280→              <div>
+   281→                <p className="text-[9px] sm:text-xs text-muted-foreground">Total comisiones (VES)</p>
+   282→                <p className="text-base sm:text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
+   283→                  {formatCurrency(totalFees)}
+   284→                </p>
+   285→              </div>
+   286→            </div>
+   287→            <div className="grid grid-cols-3 gap-1.5 sm:gap-4 flex-1 text-[11px] sm:text-sm">
+   288→              <div>
+   289→                <p className="text-[9px] sm:text-xs text-muted-foreground">Compras</p>
+   290→                <p className="font-medium tabular-nums">{formatCurrency(r.feesCompras)}</p>
+   291→              </div>
+   292→              <div>
+   293→                <p className="text-[9px] sm:text-xs text-muted-foreground">Ventas</p>
+   294→                <p className="font-medium tabular-nums">{formatCurrency(r.feesVentas)}</p>
+   295→              </div>
+   296→              <div>
+   297→                <p className="text-[9px] sm:text-xs text-muted-foreground">Neto</p>
+   298→                <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+   299→                  {formatCurrency(totalNeto)}
+   300→                </p>
+   301→              </div>
+   302→            </div>
+   303→          </div>
+   304→        </CardContent>
+   305→      </Card>
+   306→      <Card className="border-blue-200 dark:border-blue-900/30 bg-blue-50/20 dark:bg-blue-950/5">
+   307→        <CardContent className="p-2.5 sm:p-6">
+   308→          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+   309→            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+   310→              <div className="h-7 w-7 sm:h-10 sm:w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+   311→                <DollarSign className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+   312→              </div>
+   313→              <div>
+   314→                <p className="text-[9px] sm:text-xs text-muted-foreground">Total comisiones (USD)</p>
+   315→                <p className="text-base sm:text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-400 leading-tight">
+   316→                  {formatCurrency(r.feesTotalUSD, 'USD')}
+   317→                </p>
+   318→              </div>
+   319→            </div>
+   320→            <div className="grid grid-cols-3 gap-1.5 sm:gap-4 flex-1 text-[11px] sm:text-sm">
+   321→              <div>
+   322→                <p className="text-[9px] sm:text-xs text-muted-foreground">Compras</p>
+   323→                <p className="font-medium tabular-nums">{formatCurrency(r.feesComprasUSD, 'USD')}</p>
+   324→              </div>
+   325→              <div>
+   326→                <p className="text-[9px] sm:text-xs text-muted-foreground">Ventas</p>
+   327→                <p className="font-medium tabular-nums">{formatCurrency(r.feesVentasUSD, 'USD')}</p>
+   328→              </div>
+   329→              <div>
+   330→                <p className="text-[9px] sm:text-xs text-muted-foreground">Neto</p>
+   331→                <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+   332→                  {formatCurrency(r.netComprasUSD + r.netVentasUSD, 'USD')}
+   333→                </p>
+   334→              </div>
+   335→            </div>
+   336→          </div>
+   337→        </CardContent>
+   338→      </Card>
+   339→
+   340→      {/* Gráficos */}
+   341→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
+   342→        {/* Evolución mensual */}
+   343→        <Card className="lg:col-span-2">
+   344→          <CardHeader className="p-2.5 sm:p-6">
+   345→            <CardTitle className="text-xs sm:text-base">
+   346→              Evolución mensual — Compras vs Ventas
+   347→            </CardTitle>
+   348→            <CardDescription className="text-[11px] sm:text-sm">
+   349→              Últimos 12 meses en moneda fiat (VES por defecto)
+   350→            </CardDescription>
+   351→          </CardHeader>
+   352→          <CardContent className="p-2.5 sm:p-6 pt-0">
+   353→            <div className="h-40 sm:h-72">
+   354→              <ResponsiveContainer width="100%" height="100%">
+   355→                <BarChart data={monthly} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+   356→                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+   357→                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+   358→                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatNumber(v, 0)} />
+   359→                  <Tooltip
+   360→                    formatter={(v: number) => formatCurrency(v)}
+   361→                    contentStyle={{
+   362→                      backgroundColor: 'hsl(var(--popover))',
+   363→                      border: '1px solid hsl(var(--border))',
+   364→                      borderRadius: '8px',
+   365→                      fontSize: '12px',
+   366→                    }}
+   367→                  />
+   368→                  <Legend wrapperStyle={{ fontSize: 12 }} />
+   369→                  <Bar dataKey="compras" name="Compras" fill="#10b981" radius={[4, 4, 0, 0]} />
+   370→                  <Bar dataKey="ventas" name="Ventas" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+   371→                </BarChart>
+   372→              </ResponsiveContainer>
+   373→            </div>
+   374→          </CardContent>
+   375→        </Card>
+   376→
+   377→        {/* Comisiones por exchange */}
+   378→        <Card>
+   379→          <CardHeader className="p-2.5 sm:p-6">
+   380→            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
+   381→              <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500" />
+   382→              Comisiones por exchange
+   383→            </CardTitle>
+   384→            <CardDescription className="text-[11px] sm:text-sm">Desglose de comisiones pagadas por plataforma</CardDescription>
+   385→          </CardHeader>
+   386→          <CardContent className="p-2.5 sm:p-6 pt-0">
+   387→            {stats.feesPorExchange.length === 0 ? (
+   388→              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
+   389→                Aún no hay comisiones registradas
+   390→              </p>
+   391→            ) : (
+   392→              <div className="space-y-1.5 sm:space-y-3">
+   393→                {stats.feesPorExchange.map((f) => {
+   394→                  const max = stats.feesPorExchange[0]?.totalFees || 1
+   395→                  const pct = max > 0 ? (f.totalFees / max) * 100 : 0
+   396→                  return (
+   397→                    <div key={f.exchangeId ?? 'none'} className="space-y-1">
+   398→                      <div className="flex items-center justify-between text-xs sm:text-sm">
+   399→                        <span className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
+   400→                          <span
+   401→                            className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
+   402→                            style={{ backgroundColor: f.exchangeColor }}
+   403→                          />
+   404→                          <span className="font-medium truncate">{f.exchangeName}</span>
+   405→                        </span>
+   406→                        <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400 flex-shrink-0 ml-2">
+   407→                          {formatCurrency(f.totalFees)}
+   408→                        </span>
+   409→                      </div>
+   410→                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+   411→                        <div
+   412→                          className="h-full rounded-full transition-all"
+   413→                          style={{
+   414→                            width: `${pct}%`,
+   415→                            backgroundColor: f.exchangeColor,
+   416→                          }}
+   417→                        />
+   418→                      </div>
+   419→                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+   420→                        {f.count} ops · {f.compras} comp · {f.ventas} vent
+   421→                      </p>
+   422→                    </div>
+   423→                  )
+   424→                })}
+   425→              </div>
+   426→            )}
+   427→          </CardContent>
+   428→        </Card>
+   429→
+   430→        {/* Top contrapartes */}
+   431→        <Card>
+   432→          <CardHeader className="p-2.5 sm:p-6">
+   433→            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
+   434→              <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500" />
+   435→              Top contrapartes
+   436→            </CardTitle>
+   437→            <CardDescription className="text-[11px] sm:text-sm">Por volumen fiat operado</CardDescription>
+   438→          </CardHeader>
+   439→          <CardContent className="p-2.5 sm:p-6 pt-0">
+   440→            {stats.topCounterpartes.length === 0 ? (
+   441→              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
+   442→                Aún no hay datos
+   443→              </p>
+   444→            ) : (
+   445→              <div className="space-y-1.5 sm:space-y-3">
+   446→                {stats.topCounterpartes.map((c, i) => {
+   447→                  const max = stats.topCounterpartes[0].total || 1
+   448→                  const pct = (c.total / max) * 100
+   449→                  return (
+   450→                    <div key={c.counterparty} className="space-y-1">
+   451→                      <div className="flex items-center justify-between text-xs sm:text-sm">
+   452→                        <span className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
+   453→                          <span className="text-[10px] sm:text-xs text-muted-foreground w-4 flex-shrink-0">
+   454→                            #{i + 1}
+   455→                          </span>
+   456→                          <span className="font-medium truncate">
+   457→                            {c.counterparty}
+   458→                          </span>
+   459→                        </span>
+   460→                        <span className="tabular-nums font-medium flex-shrink-0 ml-2">
+   461→                          {formatCurrency(c.total)}
+   462→                        </span>
+   463→                      </div>
+   464→                      <div className="h-1.5 sm:h-2 rounded-full bg-muted overflow-hidden">
+   465→                        <div
+   466→                          className="h-full rounded-full transition-all"
+   467→                          style={{
+   468→                            width: `${pct}%`,
+   469→                            backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
+   470→                          }}
+   471→                        />
+   472→                      </div>
+   473→                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+   474→                        {c.count} ops · {formatNumber(c.amount)} u.
+   475→                      </p>
+   476→                    </div>
+   477→                  )
+   478→                })}
+   479→              </div>
+   480→            )}
+   481→          </CardContent>
+   482→        </Card>
+   483→
+   484→        {/* Activos negociados */}
+   485→        <Card className="lg:col-span-2">
+   486→          <CardHeader className="p-2.5 sm:p-6">
+   487→            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
+   488→              <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+   489→              Activos negociados
+   490→            </CardTitle>
+   491→            <CardDescription className="text-[11px] sm:text-sm">
+   492→              Distribución por volumen fiat
+   493→            </CardDescription>
+   494→          </CardHeader>
+   495→          <CardContent className="p-2.5 sm:p-6 pt-0">
+   496→            {stats.activos.length === 0 ? (
+   497→              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
+   498→                Aún no hay datos
+   499→              </p>
+   500→            ) : (
+   501→              <div className="flex items-center gap-2 sm:gap-4">
+   502→                <div className="h-24 w-24 sm:h-48 sm:w-48 flex-shrink-0">
+   503→                  <ResponsiveContainer width="100%" height="100%">
+   504→                    <PieChart>
+   505→                      <Pie
+   506→                        data={stats.activos}
+   507→                        dataKey="total"
+   508→                        nameKey="asset"
+   509→                        cx="50%"
+   510→                        cy="50%"
+   511→                        outerRadius={42}
+   512→                        innerRadius={24}
+   513→                        paddingAngle={2}
+   514→                      >
+   515→                        {stats.activos.map((_, i) => (
+   516→                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+   517→                        ))}
+   518→                      </Pie>
+   519→                      <Tooltip
+   520→                        formatter={(v: number, _n, p: { payload?: { asset?: string } }) =>
+   521→                          `${formatCurrency(v)} (${p?.payload?.asset ?? ''})`
+   522→                        }
+   523→                        contentStyle={{
+   524→                          backgroundColor: 'hsl(var(--popover))',
+   525→                          border: '1px solid hsl(var(--border))',
+   526→                          borderRadius: '8px',
+   527→                          fontSize: '12px',
+   528→                        }}
+   529→                      />
+   530→                    </PieChart>
+   531→                  </ResponsiveContainer>
+   532→                </div>
+   533→                <div className="flex-1 space-y-1 sm:space-y-2 min-w-0">
+   534→                  {stats.activos.map((a, i) => (
+   535→                    <div
+   536→                      key={a.asset}
+   537→                      className="flex items-center justify-between text-xs sm:text-sm"
+   538→                    >
+   539→                      <span className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+   540→                        <span
+   541→                          className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
+   542→                          style={{
+   543→                            backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
+   544→                          }}
+   545→                        />
+   546→                        <span className="font-medium">{a.asset}</span>
+   547→                      </span>
+   548→                      <div className="text-right flex-shrink-0 ml-2">
+   549→                        <div className="tabular-nums font-medium">
+   550→                          {formatCurrency(a.total)}
+   551→                        </div>
+   552→                        <div className="text-[10px] sm:text-xs text-muted-foreground">
+   553→                          {formatNumber(a.amount)} · {a.count} ops
+   554→                        </div>
+   555→                      </div>
+   556→                    </div>
+   557→                  ))}
+   558→                </div>
+   559→              </div>
+   560→            )}
+   561→          </CardContent>
+   562→        </Card>
+   563→      </div>
+   564→
+   565→      {/* Footer informativo */}
+   566→      <Card>
+   567→        <CardContent className="p-2.5 sm:p-6">
+   568→          <div className="flex items-start gap-2 sm:gap-3 text-[11px] sm:text-sm">
+   569→            <Users className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+   570→            <div className="space-y-1">
+   571→              <p className="font-medium text-xs sm:text-base">Cómo se calcula la ganancia neta</p>
+   572→              <p className="text-muted-foreground text-[11px] sm:text-sm">
+   573→                Tomamos la diferencia entre la tasa promedio de venta y la de compra,
+   574→                multiplicada por el volumen cruzado (mínimo entre lo comprado y vendido),
+   575→                y le restamos todas las comisiones acumuladas (de compra, venta y fijas
+   576→                de cada exchange). Esto te da una estimación real de cuánto ganaste
+   577→                después de costos. Para un cálculo exacto registra cada operación con su
+   578→                exchange y tasa específica.
+   579→              </p>
+   580→            </div>
+   581→          </div>
+   582→        </CardContent>
+   583→      </Card>
+   584→    </div>
+   585→  )
+   586→}
+   587→

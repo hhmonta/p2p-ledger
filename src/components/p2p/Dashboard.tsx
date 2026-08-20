@@ -30,16 +30,50 @@ import {
   Activity,
   Users,
   Clock,
-  Trophy,
   Building2,
   Percent,
   DollarSign,
+  ArrowLeftRight,
 } from 'lucide-react'
 import type { Stats } from '@/lib/types'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import * as storage from '@/lib/storage'
 
 const PIE_COLORS = ['#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#ef4444', '#3b82f6', '#84cc16']
+
+// Subcomponente: tarjeta KPI
+function KpiCard({
+  icon: Icon,
+  iconColor,
+  label,
+  value,
+  sub,
+  valueColor,
+  className = '',
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  iconColor?: string
+  label: string
+  value: string
+  sub?: string
+  valueColor?: string
+  className?: string
+}) {
+  return (
+    <Card className={`p-0 ${className}`}>
+      <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
+        <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
+          <Icon className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${iconColor ?? ''}`} />
+          {label}
+        </CardDescription>
+        <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${valueColor ?? ''}`}>
+          {value}
+        </CardTitle>
+        {sub && <p className="text-[9px] sm:text-xs text-muted-foreground">{sub}</p>}
+      </CardHeader>
+    </Card>
+  )
+}
 
 export function Dashboard() {
   const { data: stats, isLoading } = useQuery<Stats>({
@@ -51,12 +85,12 @@ export function Dashboard() {
     return (
       <div className="space-y-2.5 sm:space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="h-16 sm:h-24 animate-pulse bg-muted/40" />
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="h-20 sm:h-24 animate-pulse bg-muted/40" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
-          {[...Array(2)].map((_, i) => (
+          {[...Array(3)].map((_, i) => (
             <Card key={i} className="h-56 sm:h-64 animate-pulse bg-muted/40" />
           ))}
         </div>
@@ -68,10 +102,7 @@ export function Dashboard() {
   const monthly = stats.monthly.map((m) => {
     const [y, mo] = m.month.split('-')
     const date = new Date(Number(y), Number(mo) - 1, 1)
-    return {
-      ...m,
-      label: date.toLocaleString('es-VE', { month: 'short' }),
-    }
+    return { ...m, label: date.toLocaleString('es-VE', { month: 'short' }) }
   })
 
   const gananciaColor =
@@ -81,8 +112,15 @@ export function Dashboard() {
         ? 'text-rose-600 dark:text-rose-400'
         : 'text-muted-foreground'
 
-  const totalFees = r.feesCompras + r.feesVentas
-  const totalNeto = r.netCompras + r.netVentas
+  const gananciaColorUSD =
+    r.gananciaNetaUSD > 0
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : r.gananciaNetaUSD < 0
+        ? 'text-rose-600 dark:text-rose-400'
+        : 'text-muted-foreground'
+
+  const spread = r.avgRateVenta - r.avgRateCompra
+  const spreadColor = spread >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
 
   return (
     <div className="space-y-2.5 sm:space-y-4">
@@ -90,186 +128,114 @@ export function Dashboard() {
       <div>
         <h2 className="text-base sm:text-xl font-semibold">Resumen general</h2>
         <p className="text-[11px] sm:text-sm text-muted-foreground">
-          Visión global de tu actividad P2P: volumen, comisiones, tasas y ganancia neta.
+          Actividad P2P separada por moneda: volumen, comisiones, tasas y ganancia neta.
         </p>
       </div>
 
-      {/* KPIs principales - VES */}
+      {/* ========== BLOQUE VES ========== */}
       <div className="space-y-1.5">
-        <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <p className="text-[10px] sm:text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
           <Coins className="h-3 w-3" /> En VES (Bolívares)
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
-          <Card className="p-0">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
-                Total comprado
-              </CardDescription>
-              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {formatCurrency(r.totalCompras)}
-              </CardTitle>
-              <p className="text-[9px] sm:text-xs text-muted-foreground">
-                {r.cantidadCompras} ops · {formatNumber(r.montoCompras)} u.
-              </p>
-            </CardHeader>
-          </Card>
-          <Card className="p-0">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
-                Total vendido
-              </CardDescription>
-              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {formatCurrency(r.totalVentas)}
-              </CardTitle>
-              <p className="text-[9px] sm:text-xs text-muted-foreground">
-                {r.cantidadVentas} ops · {formatNumber(r.montoVentas)} u.
-              </p>
-            </CardHeader>
-          </Card>
-          <Card className="p-0">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                Ganancia neta
-              </CardDescription>
-              <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
-                {formatCurrency(r.gananciaNeta)}
-              </CardTitle>
-              <p className="text-[9px] sm:text-xs text-muted-foreground">
-                Spread × vol − fees
-              </p>
-            </CardHeader>
-          </Card>
-          <Card className="p-0">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <Wallet className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                Stock activo
-              </CardDescription>
-              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {formatCurrency(r.activoNeto)}
-              </CardTitle>
-              <p className="text-[9px] sm:text-xs text-muted-foreground">
-                Capital en VES
-              </p>
-            </CardHeader>
-          </Card>
+          <KpiCard
+            icon={TrendingUp}
+            iconColor="text-emerald-500"
+            label="Total comprado"
+            value={formatCurrency(r.totalCompras)}
+            sub={`${r.cantidadCompras} ops · ${formatNumber(r.montoCompras)} u.`}
+          />
+          <KpiCard
+            icon={TrendingDown}
+            iconColor="text-rose-500"
+            label="Total vendido"
+            value={formatCurrency(r.totalVentas)}
+            sub={`${r.cantidadVentas} ops · ${formatNumber(r.montoVentas)} u.`}
+          />
+          <KpiCard
+            icon={PiggyBank}
+            label="Ganancia neta"
+            value={formatCurrency(r.gananciaNeta)}
+            valueColor={gananciaColor}
+            sub="Spread × vol − fees"
+          />
+          <KpiCard
+            icon={Wallet}
+            label="Capital neto"
+            value={formatCurrency(r.activoNeto)}
+            sub="Compras − Ventas (neto)"
+          />
         </div>
       </div>
 
-      {/* KPIs principales - USD */}
+      {/* ========== BLOQUE USD ========== */}
       <div className="space-y-1.5">
-        <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <p className="text-[10px] sm:text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
           <DollarSign className="h-3 w-3" /> En USD (Dólares)
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
-          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
-                Total comprado
-              </CardDescription>
-              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {formatCurrency(r.totalComprasUSD, 'USD')}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <TrendingDown className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
-                Total vendido
-              </CardDescription>
-              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {formatCurrency(r.totalVentasUSD, 'USD')}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <PiggyBank className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                Ganancia neta
-              </CardDescription>
-              <CardTitle className={`text-sm sm:text-xl tabular-nums leading-tight ${gananciaColor}`}>
-                {formatCurrency(r.gananciaNetaUSD, 'USD')}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="p-0 border-blue-100 dark:border-blue-900/30">
-            <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-              <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-                <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                Stock activo
-              </CardDescription>
-              <CardTitle className="text-sm sm:text-xl tabular-nums leading-tight">
-                {formatCurrency(r.activoNetoUSD, 'USD')}
-              </CardTitle>
-            </CardHeader>
-          </Card>
+          <KpiCard
+            icon={TrendingUp}
+            iconColor="text-emerald-500"
+            label="Total comprado"
+            value={formatCurrency(r.totalComprasUSD, 'USD')}
+            className="border-blue-100 dark:border-blue-900/30"
+          />
+          <KpiCard
+            icon={TrendingDown}
+            iconColor="text-rose-500"
+            label="Total vendido"
+            value={formatCurrency(r.totalVentasUSD, 'USD')}
+            className="border-blue-100 dark:border-blue-900/30"
+          />
+          <KpiCard
+            icon={PiggyBank}
+            label="Ganancia neta"
+            value={formatCurrency(r.gananciaNetaUSD, 'USD')}
+            valueColor={gananciaColorUSD}
+            className="border-blue-100 dark:border-blue-900/30"
+          />
+          <KpiCard
+            icon={Wallet}
+            label="Capital neto"
+            value={formatCurrency(r.activoNetoUSD, 'USD')}
+            sub="Compras − Ventas (neto)"
+            className="border-blue-100 dark:border-blue-900/30"
+          />
         </div>
       </div>
 
-      {/* KPIs secundarios: tasas y operación */}
+      {/* ========== TASAS Y OPERACIÓN ========== */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <Coins className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              Tasa compra
-            </CardDescription>
-            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
-              {formatNumber(r.avgRateCompra, 2)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <Coins className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              Tasa venta
-            </CardDescription>
-            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
-              {formatNumber(r.avgRateVenta, 2)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <Activity className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              Spread
-            </CardDescription>
-            <CardTitle
-              className={`text-xs sm:text-lg tabular-nums leading-tight ${
-                r.avgRateVenta - r.avgRateCompra >= 0
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-rose-600 dark:text-rose-400'
-              }`}
-            >
-              {formatNumber(r.avgRateVenta - r.avgRateCompra, 2)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="p-0">
-          <CardHeader className="p-2 sm:p-3 pb-1 sm:pb-2">
-            <CardDescription className="flex items-center gap-1 text-[9px] sm:text-xs">
-              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
-              Pendientes
-            </CardDescription>
-            <CardTitle className="text-xs sm:text-lg tabular-nums leading-tight">
-              {r.pendientes}
-            </CardTitle>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">
-              Por confirmar
-            </p>
-          </CardHeader>
-        </Card>
+        <KpiCard
+          icon={Coins}
+          iconColor="text-emerald-500"
+          label="Tasa compra prom."
+          value={formatNumber(r.avgRateCompra, 2)}
+        />
+        <KpiCard
+          icon={Coins}
+          iconColor="text-rose-500"
+          label="Tasa venta prom."
+          value={formatNumber(r.avgRateVenta, 2)}
+        />
+        <KpiCard
+          icon={ArrowLeftRight}
+          iconColor={spreadColor}
+          label="Spread"
+          value={formatNumber(spread, 2)}
+          valueColor={spreadColor}
+        />
+        <KpiCard
+          icon={Clock}
+          iconColor="text-amber-500"
+          label="Pendientes"
+          value={String(r.pendientes)}
+          sub="Por confirmar"
+        />
       </div>
 
-      {/* Comisiones: bloque destacado VES + USD */}
+      {/* ========== COMISIONES VES ========== */}
       <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
         <CardContent className="p-2.5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
@@ -280,7 +246,7 @@ export function Dashboard() {
               <div>
                 <p className="text-[9px] sm:text-xs text-muted-foreground">Total comisiones (VES)</p>
                 <p className="text-base sm:text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400 leading-tight">
-                  {formatCurrency(totalFees)}
+                  {formatCurrency(r.feesTotal)}
                 </p>
               </div>
             </div>
@@ -294,15 +260,17 @@ export function Dashboard() {
                 <p className="font-medium tabular-nums">{formatCurrency(r.feesVentas)}</p>
               </div>
               <div>
-                <p className="text-[9px] sm:text-xs text-muted-foreground">Neto</p>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Capital neto</p>
                 <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {formatCurrency(totalNeto)}
+                  {formatCurrency(r.netCompras - r.netVentas)}
                 </p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* ========== COMISIONES USD ========== */}
       <Card className="border-blue-200 dark:border-blue-900/30 bg-blue-50/20 dark:bg-blue-950/5">
         <CardContent className="p-2.5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
@@ -327,9 +295,9 @@ export function Dashboard() {
                 <p className="font-medium tabular-nums">{formatCurrency(r.feesVentasUSD, 'USD')}</p>
               </div>
               <div>
-                <p className="text-[9px] sm:text-xs text-muted-foreground">Neto</p>
+                <p className="text-[9px] sm:text-xs text-muted-foreground">Capital neto</p>
                 <p className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {formatCurrency(r.netComprasUSD + r.netVentasUSD, 'USD')}
+                  {formatCurrency(r.netComprasUSD - r.netVentasUSD, 'USD')}
                 </p>
               </div>
             </div>
@@ -337,7 +305,7 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Gráficos */}
+      {/* ========== GRÁFICOS ========== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
         {/* Evolución mensual */}
         <Card className="lg:col-span-2">
@@ -346,7 +314,7 @@ export function Dashboard() {
               Evolución mensual — Compras vs Ventas
             </CardTitle>
             <CardDescription className="text-[11px] sm:text-sm">
-              Últimos 12 meses en moneda fiat (VES por defecto)
+              Últimos 12 meses (montos en la moneda de cada transacción)
             </CardDescription>
           </CardHeader>
           <CardContent className="p-2.5 sm:p-6 pt-0">
@@ -374,8 +342,118 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Comisiones por exchange */}
+        {/* Top contrapartes */}
         <Card>
+          <CardHeader className="p-2.5 sm:p-6">
+            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-violet-500" />
+              Top contrapartes
+            </CardTitle>
+            <CardDescription className="text-[11px] sm:text-sm">Mayores volúmenes operados</CardDescription>
+          </CardHeader>
+          <CardContent className="p-2.5 sm:p-6 pt-0">
+            {stats.topCounterpartes.length === 0 ? (
+              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
+                Aún no hay operaciones completadas
+              </p>
+            ) : (
+              <div className="space-y-1.5 sm:space-y-3">
+                {stats.topCounterpartes.map((cp, i) => {
+                  const max = stats.topCounterpartes[0]?.total || 1
+                  const pct = max > 0 ? (cp.total / max) * 100 : 0
+                  return (
+                    <div key={cp.counterparty} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <span className="font-medium truncate min-w-0">
+                          <span className="text-muted-foreground mr-1.5">{i + 1}.</span>
+                          {cp.counterparty}
+                        </span>
+                        <span className="tabular-nums font-medium flex-shrink-0 ml-2">
+                          {formatCurrency(cp.total)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-violet-500 transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground">
+                        {cp.count} ops · {formatNumber(cp.amount)} unidades
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Activos (pie chart) */}
+        <Card>
+          <CardHeader className="p-2.5 sm:p-6">
+            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
+              <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500" />
+              Activos operados
+            </CardTitle>
+            <CardDescription className="text-[11px] sm:text-sm">Distribución por criptoactivo</CardDescription>
+          </CardHeader>
+          <CardContent className="p-2.5 sm:p-6 pt-0">
+            {stats.activos.length === 0 ? (
+              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
+                Aún no hay operaciones completadas
+              </p>
+            ) : (
+              <>
+                <div className="h-32 sm:h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.activos}
+                        dataKey="total"
+                        nameKey="asset"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="70%"
+                        innerRadius="40%"
+                        paddingAngle={2}
+                        strokeWidth={0}
+                      >
+                        {stats.activos.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number) => formatCurrency(v)}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--popover))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                  {stats.activos.map((a, i) => (
+                    <div key={a.asset} className="flex items-center gap-1.5 text-[10px] sm:text-xs">
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                      />
+                      <span className="font-medium">{a.asset}</span>
+                      <span className="text-muted-foreground">{a.count} ops</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Comisiones por exchange */}
+        <Card className="lg:col-span-2">
           <CardHeader className="p-2.5 sm:p-6">
             <CardTitle className="text-xs sm:text-base flex items-center gap-2">
               <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500" />
@@ -389,198 +467,41 @@ export function Dashboard() {
                 Aún no hay comisiones registradas
               </p>
             ) : (
-              <div className="space-y-1.5 sm:space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 {stats.feesPorExchange.map((f) => {
                   const max = stats.feesPorExchange[0]?.totalFees || 1
                   const pct = max > 0 ? (f.totalFees / max) * 100 : 0
                   return (
-                    <div key={f.exchangeId ?? 'none'} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
-                          <span
-                            className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: f.exchangeColor }}
-                          />
-                          <span className="font-medium truncate">{f.exchangeName}</span>
-                        </span>
-                        <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400 flex-shrink-0 ml-2">
-                          {formatCurrency(f.totalFees)}
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: f.exchangeColor,
-                          }}
-                        />
-                      </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">
-                        {f.count} ops · {f.compras} comp · {f.ventas} vent
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Top contrapartes */}
-        <Card>
-          <CardHeader className="p-2.5 sm:p-6">
-            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
-              <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500" />
-              Top contrapartes
-            </CardTitle>
-            <CardDescription className="text-[11px] sm:text-sm">Por volumen fiat operado</CardDescription>
-          </CardHeader>
-          <CardContent className="p-2.5 sm:p-6 pt-0">
-            {stats.topCounterpartes.length === 0 ? (
-              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
-                Aún no hay datos
-              </p>
-            ) : (
-              <div className="space-y-1.5 sm:space-y-3">
-                {stats.topCounterpartes.map((c, i) => {
-                  const max = stats.topCounterpartes[0].total || 1
-                  const pct = (c.total / max) * 100
-                  return (
-                    <div key={c.counterparty} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="flex items-center gap-1.5 sm:gap-2 truncate min-w-0">
-                          <span className="text-[10px] sm:text-xs text-muted-foreground w-4 flex-shrink-0">
-                            #{i + 1}
-                          </span>
-                          <span className="font-medium truncate">
-                            {c.counterparty}
-                          </span>
-                        </span>
-                        <span className="tabular-nums font-medium flex-shrink-0 ml-2">
-                          {formatCurrency(c.total)}
-                        </span>
-                      </div>
-                      <div className="h-1.5 sm:h-2 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
-                          }}
-                        />
-                      </div>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">
-                        {c.count} ops · {formatNumber(c.amount)} u.
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Activos negociados */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="p-2.5 sm:p-6">
-            <CardTitle className="text-xs sm:text-base flex items-center gap-2">
-              <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              Activos negociados
-            </CardTitle>
-            <CardDescription className="text-[11px] sm:text-sm">
-              Distribución por volumen fiat
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-2.5 sm:p-6 pt-0">
-            {stats.activos.length === 0 ? (
-              <p className="text-[11px] sm:text-sm text-muted-foreground py-4 sm:py-6 text-center">
-                Aún no hay datos
-              </p>
-            ) : (
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="h-24 w-24 sm:h-48 sm:w-48 flex-shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={stats.activos}
-                        dataKey="total"
-                        nameKey="asset"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={42}
-                        innerRadius={24}
-                        paddingAngle={2}
-                      >
-                        {stats.activos.map((_, i) => (
-                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number, _n, p: { payload?: { asset?: string } }) =>
-                          `${formatCurrency(v)} (${p?.payload?.asset ?? ''})`
-                        }
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--popover))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                        }}
+                    <div key={f.exchangeId ?? 'none'} className="flex items-center gap-2 sm:gap-3">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: f.exchangeColor }}
                       />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex-1 space-y-1 sm:space-y-2 min-w-0">
-                  {stats.activos.map((a, i) => (
-                    <div
-                      key={a.asset}
-                      className="flex items-center justify-between text-xs sm:text-sm"
-                    >
-                      <span className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <span
-                          className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
-                          style={{
-                            backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
-                          }}
-                        />
-                        <span className="font-medium">{a.asset}</span>
-                      </span>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <div className="tabular-nums font-medium">
-                          {formatCurrency(a.total)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <span className="font-medium truncate">{f.exchangeName}</span>
+                          <span className="tabular-nums font-medium text-amber-600 dark:text-amber-400 flex-shrink-0 ml-2">
+                            {formatCurrency(f.totalFees)}
+                          </span>
                         </div>
-                        <div className="text-[10px] sm:text-xs text-muted-foreground">
-                          {formatNumber(a.amount)} · {a.count} ops
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-1">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, backgroundColor: f.exchangeColor }}
+                          />
                         </div>
+                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">
+                          {f.count} ops · {f.compras}C / {f.ventas}V
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Footer informativo */}
-      <Card>
-        <CardContent className="p-2.5 sm:p-6">
-          <div className="flex items-start gap-2 sm:gap-3 text-[11px] sm:text-sm">
-            <Users className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-medium text-xs sm:text-base">Cómo se calcula la ganancia neta</p>
-              <p className="text-muted-foreground text-[11px] sm:text-sm">
-                Tomamos la diferencia entre la tasa promedio de venta y la de compra,
-                multiplicada por el volumen cruzado (mínimo entre lo comprado y vendido),
-                y le restamos todas las comisiones acumuladas (de compra, venta y fijas
-                de cada exchange). Esto te da una estimación real de cuánto ganaste
-                después de costos. Para un cálculo exacto registra cada operación con su
-                exchange y tasa específica.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
