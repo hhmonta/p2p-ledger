@@ -145,8 +145,7 @@ function AppContent() {
             <TabsList className="grid w-full min-w-max sm:min-w-0 grid-cols-4 sm:grid-cols-7 mb-2 sm:mb-6 h-auto gap-1">
               <TabsTrigger value="dashboard" className="flex items-center gap-1 py-1.5 sm:py-2 text-[11px] sm:text-sm px-2 sm:px-3">
                 <LayoutDashboard className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                <span className="hidden sm:inline">Dashboard</span>
-                <span className="sm:hidden">Resumen</span>
+                Dashboard
               </TabsTrigger>
               <TabsTrigger value="bancos" className="flex items-center gap-1 py-1.5 sm:py-2 text-[11px] sm:text-sm px-2 sm:px-3">
                 <Landmark className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
